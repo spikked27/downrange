@@ -1,0 +1,43 @@
+name: Verify trajectory source schemas
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/auto-trajectories]
+    paths: [.github/workflows/source-schema.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import urllib.request,json,re
+          def get(url):
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Downrange/0.3 source-compatibility-check'}),timeout=20) as r:
+                      text=r.read(4000000).decode(); print('URL',url,'STATUS',r.status);return text
+              except Exception as e:print('UNAVAILABLE',url,str(e));return ''
+          d=get('https://jellyfish.johnkrausphotos.com/api/v2/upcoming')
+          try:
+              j=json.loads(d);print('JELLYFISH_METADATA',json.dumps(j)[:14000])
+          except ValueError:pass
+          h=get('https://nextspaceflight.com/launches/')
+          i=h.find('/launches/details/');print('NSF_INDEX_SAMPLE',h[max(0,i-600):i+3500])
+          h=get('https://nextspaceflight.com/launches/details/7826/')
+          for tag in ('application/ld+json','<h1','2026-10-02','Northeast'):
+              i=h.find(tag);print('NSF_SAMPLE',tag,h[max(0,i-150):i+1000])
+          d=get('https://ll.thespacedevs.com/2.3.0/launches/upcoming/?limit=3&mode=normal&format=json')
+          try:
+              j=json.loads(d)
+              for l in j.get('results',[]):
+                  print('LL2_KEYS',list(l));print('LL2_SELECTED',json.dumps({k:v for k,v in l.items() if k in ('id','name','net','net_precision','mission','pad','flightclub_url','info_urls','vid_urls','orbital_launch_attempt_count','type')}))
+          except ValueError:pass
+          d=get('https://api.flightclub.io/v3/api-docs')
+          try:
+              j=json.loads(d);schemas=j['components']['schemas']
+              print('FC_SNAPSHOT_THRUST',{k:v for k,v in schemas['TrajectorySnapshot']['properties'].items() if k in ('ts','tl','t','frames')})
+              print('FC_INITIAL_CONDITIONS',json.dumps(schemas.get('InitialConditionsBlueprint',{})))
+          except ValueError:pass
+          PY
