@@ -1,25 +1,17 @@
-# Validation: 0.3.0-alpha.2
+# Validation index
 
-## Published release — October 2, 2026
+## Current: 1.0.0-alpha.1
 
-[GitHub Actions run 37007731533](https://github.com/spikked27/downrange/actions/runs/37007731533) completed successfully for application commit `95f72b35e6f56112c249e9de7406fb8b3c86643d`.
+See [the complete alpha-1 release record](RELEASE-1.0-ALPHA.md). Application commit `47a46ce7b60a0a83dcc788c3d45ac06996109d1b` passed [release run 37035217498](https://github.com/spikked27/downrange/actions/runs/37035217498): 187 Python tests, JavaScript assertions, desktop/mobile actual HTTP interactions, observer-view interactions, real localhost service-worker/offline-shell checks, Docker startup/permission checks, replacement from four published predecessor versions, and publication plus anonymous latest-pull identity verification.
 
-- Clean Python 3.13 test job: **135 tests passed**, one upstream Starlette/AnyIO deprecation warning. JavaScript and shell syntax checks passed.
-- Linux amd64 Docker image build: passed.
-- Fresh-container startup, file permissions and restart/key-persistence checks: passed.
-- Actual previous-image upgrade: passed. The test pulled the published `0.2.0-alpha.1` image, created isolated test appdata through its HTTP API, replaced the container with the new image, and confirmed that the old password, existing login session, saved location, notification preferences, push subscription and VAPID private key all survived.
-- Automatic pre-upgrade consistent database snapshot and notification-key copy: verified present.
-- Publication of the exact tested image as `ghcr.io/spikked27/downrange:0.3.0-alpha.2`, `ghcr.io/spikked27/downrange:latest`, and the exact-commit tag: passed.
-- Anonymous pull of `latest` with an empty Docker credential configuration: passed. The downloaded reference reported version `0.3.0-alpha.2` and matched the tested local image ID.
+[Live source run 37034963761](https://github.com/spikked27/downrange/actions/runs/37034963761) separately verified at least one parsed historical ascent analogue for each configured Falcon mission class after fixing the exact known CRS-8 catalogue URL. Source compatibility is not forecast-accuracy validation.
 
-Published manifest digest: `sha256:41715e56e33d79a4b59e3c8c1d8a4e8bf6e387b0ae3244dfb1754f7194a3292d`.
+The tests did not use the user's actual server or appdata and did not send real push. Production TLS, cross-version browser-worker migration, actual device receipt, historical sighting performance, all-provider trajectory quality and line-of-sight weather are not validated merely by the tests above.
 
-The update channel was published at approximately 12:38 UTC. Later documentation-only commits do not change this image. Existing Unraid installations must change the Repository once from a pinned/local tag to `ghcr.io/spikked27/downrange:latest`; subsequent versions can be applied through the normal Unraid Docker update controls. Exact version tags remain rollback points. `latest` is still an alpha channel, not a claim of production forecasting maturity.
+## Earlier releases
 
-## Test scope and limits
+Observer view: [0.3.2 notes](RELEASE-0.3.2.md), when available.
 
-The local integrated suite also passed 135 tests. Source-adapter tests cover mission/date matching, conflicting direction retention, robots/backoff, endpoint boundaries, historical units, Earth-fixed simulation conversion, and multiple provider families. Account and notification tests cover ownership isolation, eligibility, key persistence and upgrade continuity.
+Time chart: [0.3.1 notes](RELEASE-0.3.1.md), release run 37014555009.
 
-Upgrade tests used temporary CI volumes, not the user's server or real appdata, and did not send real push messages. Publication does not mean an existing Unraid instance has already updated; its owner must Apply the repository change or run the GUI update. The full production HTTPS/PWA/device-notification path still needs deployment testing.
-
-Earlier live public-source adapter check: [Actions run 36968346040](https://github.com/spikked27/downrange/actions/runs/36968346040) matched NROL-97 public directions and a historical Falcon Heavy ascent analogue. This proves data conversion and geometry, not actual sighting or weather accuracy. Authenticated Flight Club access and historical forecast accuracy remain unverified. Weather is displayed separately and does not yet gate alerts.
+Automatic source integration and GUI update channel: 0.3.0-alpha.2, release run 37007731533, application commit `95f72b35e6f56112c249e9de7406fb8b3c86643d`. Its original suite passed 135 tests and a real 0.2 predecessor-image upgrade. The GUI update reference remains `ghcr.io/spikked27/downrange:latest`; exact-version references remain available as rollback points.
