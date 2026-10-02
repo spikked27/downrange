@@ -7,7 +7,14 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from app.store import Store
 from app.geometry import illustrative_track
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
+
+
+def wait_until(check):
+    deadline=time.monotonic()+12
+    while not check():
+        if time.monotonic()>deadline:raise AssertionError('Timed out waiting for synchronized UI state')
+        time.sleep(.05)
 
 
 def main():
@@ -58,28 +65,28 @@ def main():
                     sky=page.locator('#observerCanvas');sky.wait_for(state='visible')
                     assert page.locator('#observerView').count()==1
                     page.locator('#timeSlider').evaluate('(e)=>{e.value=0;e.dispatchEvent(new Event("input",{bubbles:true}));}')
-                    page.wait_for_function('document.querySelector("#observerCanvas").dataset.marker==="hidden-below-horizon"')
+                    expect(sky).to_have_attribute('data-marker','hidden-below-horizon')
                     assert page.locator('#observerTime').input_value()=='0'
                     page.locator('#observerTime').evaluate('(e)=>{e.value=240;e.dispatchEvent(new Event("input",{bubbles:true}));}')
                     assert page.locator('#timeSlider').input_value()=='240'
-                    page.wait_for_function('document.querySelector("#observerCanvas").dataset.time==="240"')
+                    expect(sky).to_have_attribute('data-time','240')
                     assert 'T+04:00' in page.locator('#timeReadout').inner_text()
                     assert 'no modeled luminous segment' in page.locator('#observerStatus').inner_text()
                     page.locator('.viewing-event').nth(1).click()
                     peak=page.locator('.viewing-event').nth(1).get_attribute('data-seek')
-                    page.wait_for_function('(t)=>Number(document.querySelector("#observerTime").value)===Math.round(Number(t))',arg=peak)
+                    wait_until(lambda: float(page.locator('#observerTime').input_value())==round(float(peak)))
                     page.locator('#observerFollow').check()
-                    page.wait_for_function('document.querySelector("#observerCanvas").dataset.marker==="in-view"')
+                    expect(sky).to_have_attribute('data-marker','in-view')
                     before=page.locator('#observerOrientation').inner_text();sky.focus();sky.press('ArrowRight')
-                    page.wait_for_function('(s)=>document.querySelector("#observerOrientation").textContent!==s',arg=before)
+                    expect(page.locator('#observerOrientation')).not_to_have_text(before)
                     assert not page.locator('#observerFollow').is_checked()
                     fov=page.locator('#observerFov').inner_text();page.locator('#observerZoomIn').click()
-                    page.wait_for_function('(s)=>document.querySelector("#observerFov").textContent!==s',arg=fov)
+                    expect(page.locator('#observerFov')).not_to_have_text(fov)
                     page.locator('#observerGuide').uncheck();assert not page.locator('#observerGuide').is_checked()
                     page.locator('#observerGuide').check();page.locator('#observerFit').click()
                     page.locator('#observerStart').click();first=float(page.locator('#observerTime').input_value())
                     page.locator('#observerPlay').click()
-                    page.wait_for_function('(t)=>Number(document.querySelector("#observerTime").value)>t',arg=first)
+                    wait_until(lambda: float(page.locator('#observerTime').input_value())>first)
                     page.locator('#observerPlay').click();assert page.locator('#observerPlay').get_attribute('aria-pressed')=='false'
                     page.locator('#observerTime').evaluate('(e)=>{e.value=300;e.dispatchEvent(new Event("input",{bubbles:true}));}')
                     page.locator('#observerFit').click();page.wait_for_timeout(100)
