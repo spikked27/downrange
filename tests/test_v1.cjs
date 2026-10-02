@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict');
+const {horizonLimit,selected}=require('../app/static/v1-ui.js');
+assert.equal(horizonLimit([],5,180),5);
+assert.equal(horizonLimit([0,0,0,0,40,0,0,0],5,180),40);
+assert.equal(horizonLimit([0,0,0,0,40,0,0,0],5,157.5),20);
+assert.equal(horizonLimit([20,0,0,0,0,0,0,40],0,-22.5),30);
+const l={name:'Falcon Heavy | Example',provider:'SpaceX',vehicle:'Falcon Heavy',prediction:{low_information:true,confidence:'estimated'}};
+assert(selected(l,'HEAVY','all'));
+assert(!selected(l,'Electron','all'));
+assert(!selected(l,'','constrained'));
+assert(!selected(l,'','mission'));
+const timeline=require('../app/static/timeline.js');
+const a={t_s:0,elevation:10,horizon_limit_deg:20,azimuth:180,range_km:100,sun_altitude:-10,altitude_km:30,powered:true,plume:true,sunlit:true};
+const b={...a,t_s:10,horizon_limit_deg:40};
+const p=timeline.sampleAt([a,b],5,5);
+assert.equal(p.horizon_limit_deg,30);assert(!p.above);assert(!p.ordinary);assert(!p.jellyfish);
+assert(timeline.phase(p,5).includes('30°'));
+console.log('V1 horizon interpolation, search, quality filters and sky-state assertions passed.');
