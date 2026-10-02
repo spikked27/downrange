@@ -1,10 +1,12 @@
 FROM python:3.13-slim-bookworm
-ARG VERSION=0.2.0-alpha.1
+ARG VERSION=0.3.0-alpha.2
+ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Downrange" \
       org.opencontainers.image.description="Self-hosted launch visibility research and push alerts" \
       org.opencontainers.image.source="https://github.com/spikked27/downrange" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="${VERSION}"
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
     DATA_DIR=/data PUID=99 PGID=100 TZ=America/New_York HOME=/tmp
 RUN apt-get update && apt-get install -y --no-install-recommends gosu ca-certificates tzdata \

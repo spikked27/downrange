@@ -117,9 +117,10 @@ def intervals(points: list[dict], field: str, net: datetime) -> list[dict]:
 def predict(launch: dict, observer: dict, track: dict | None) -> dict:
     if track is None:
         from .profiles import automatic_tracks, combine
-        scenarios = automatic_tracks(launch)
+        imported = (launch.get("acquisition") or {}).get("tracks") or []
+        scenarios = imported or automatic_tracks(launch)
         if scenarios:
-            return combine([predict(launch, observer, item) for item in scenarios], launch)
+            return combine([predict(launch, observer, item) for item in scenarios], launch, sourced=bool(imported))
         return screen(launch,observer)
     net=utc(launch["net"]); out=[]
     for p in sample_track(track):

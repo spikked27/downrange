@@ -1,33 +1,26 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Container version="2">
   <Name>Downrange-Local</Name>
-  <Repository>downrange-local:0.2.0-alpha.1</Repository>
-  <Registry />
+  <Repository>downrange-local:0.3.0-alpha.2</Repository>
   <Network>bridge</Network>
-  <MyIP />
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Support>https://github.com/spikked27/downrange/issues</Support>
   <Project>https://github.com/spikked27/downrange</Project>
-  <Overview>Downrange alpha: customizable locations, automatic experimental corridor scenarios for selected Falcon 9 launches, sourced trajectory geometry, jellyfish conditions, and browser push. Assumed scenarios are not confirmed paths. Uncertain alerts are off by default. HTTPS is required for phone push. Build with scripts/install-unraid-local.sh before applying this LOCAL template.</Overview>
+  <Overview>Developer local-build fallback. For normal Unraid GUI updates use the registry template with ghcr.io/spikked27/downrange:latest instead. Source estimates are not confirmed trajectories. HTTPS is required for phone push.</Overview>
   <Category>Other:</Category>
   <WebUI>http://[IP]:[PORT:8097]/</WebUI>
-  <TemplateURL />
   <Icon>https://raw.githubusercontent.com/spikked27/downrange/main/app/static/icon-192.png</Icon>
   <ExtraParams>--init</ExtraParams>
-  <PostArgs />
-  <DonateText />
-  <DonateLink />
-  <Description>Alpha launch visibility research and alerts. See Overview for limitations.</Description>
-  <Config Name="WebUI port" Target="8097" Default="8097" Mode="tcp" Description="Change host port if 8097 is already used." Type="Port" Display="always" Required="true" Mask="false">8097</Config>
-  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/downrange" Mode="rw" Description="Persistent accounts, locations, cache, and private notification keys. Back up this folder." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/downrange</Config>
-  <Config Name="Administrator password" Target="ADMIN_PASSWORD" Default="" Mode="" Description="12+ characters. Used only when the database is first created. Blank generates a password printed once in container logs." Type="Variable" Display="always" Required="false" Mask="true" />
-  <Config Name="HTTPS public address" Target="PUBLIC_URL" Default="" Mode="" Description="HTTPS origin, e.g. https://launch.example.com. No path. Set this after configuring the reverse proxy; use that address to sign in." Type="Variable" Display="always" Required="false" Mask="false" />
-  <Config Name="Time zone" Target="TZ" Default="America/New_York" Mode="" Description="Server timezone. Each saved viewing location has its own independent timezone." Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
-  <Config Name="Registration invitation code" Target="REGISTRATION_CODE" Default="" Mode="" Description="Optional: 16+ characters. Blank disables new-account registration." Type="Variable" Display="advanced" Required="false" Mask="true" />
-  <Config Name="Push contact" Target="VAPID_SUBJECT" Default="" Mode="" Description="Optional mailto:you@example.com. PUBLIC_URL is used as the push contact if this is blank." Type="Variable" Display="advanced" Required="false" Mask="false" />
-  <Config Name="Launch Library API token" Target="LL2_API_KEY" Default="" Mode="" Description="Optional authenticated Launch Library 2 token. Blank uses free access." Type="Variable" Display="advanced" Required="false" Mask="true" />
-  <Config Name="User ID" Target="PUID" Default="99" Mode="" Description="Unraid nobody user by default." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
-  <Config Name="Group ID" Target="PGID" Default="100" Mode="" Description="Unraid users group by default." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
-  <Config Name="Launch feed polling seconds" Target="POLL_SECONDS" Default="600" Mode="" Description="Minimum 600 seconds; centralized cache protects provider limits." Type="Variable" Display="advanced" Required="false" Mask="false">600</Config>
+  <Config Name="WebUI port" Target="8097" Default="8097" Mode="tcp" Description="Host WebUI port." Type="Port" Display="always" Required="true" Mask="false">8097</Config>
+  <Config Name="Appdata" Target="/data" Default="/mnt/user/appdata/downrange" Mode="rw" Description="Keep this mapping across updates." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/downrange</Config>
+  <Config Name="Administrator password" Target="ADMIN_PASSWORD" Default="" Mode="" Description="12+ characters, initial account creation only." Type="Variable" Display="always" Required="false" Mask="true" />
+  <Config Name="HTTPS public address" Target="PUBLIC_URL" Default="" Mode="" Description="Exact HTTPS origin; no subpath." Type="Variable" Display="always" Required="false" Mask="false" />
+  <Config Name="Time zone" Target="TZ" Default="America/New_York" Mode="" Type="Variable" Display="always" Required="false" Mask="false">America/New_York</Config>
+  <Config Name="User ID" Target="PUID" Default="99" Mode="" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="Group ID" Target="PGID" Default="100" Mode="" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+  <Config Name="Automatic trajectory sources" Target="SOURCES_ENABLED" Default="true" Mode="" Type="Variable" Display="advanced" Required="false" Mask="false">true</Config>
+  <Config Name="Flight Club API key (optional)" Target="FLIGHTCLUB_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true" />
+  <Config Name="Registration invitation code" Target="REGISTRATION_CODE" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true" />
+  <Config Name="Launch Library API token" Target="LL2_API_KEY" Default="" Mode="" Type="Variable" Display="advanced" Required="false" Mask="true" />
 </Container>

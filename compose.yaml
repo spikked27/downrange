@@ -1,8 +1,7 @@
 services:
   downrange:
-    build: .
-    image: downrange-local:0.2.0-alpha.1
-    container_name: Downrange-Local
+    image: ghcr.io/spikked27/downrange:latest
+    container_name: Downrange
     init: true
     ports:
       - "${WEB_PORT:-8097}:8097"
@@ -17,6 +16,8 @@ services:
       REGISTRATION_CODE: "${REGISTRATION_CODE:-}"
       VAPID_SUBJECT: "${VAPID_SUBJECT:-}"
       LL2_API_KEY: "${LL2_API_KEY:-}"
+      SOURCES_ENABLED: "${SOURCES_ENABLED:-true}"
+      FLIGHTCLUB_API_KEY: "${FLIGHTCLUB_API_KEY:-}"
       POLL_SECONDS: "600"
       DEMO_MODE: "false"
     restart: unless-stopped

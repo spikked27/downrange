@@ -16,6 +16,8 @@ from .security import Limiter, password_hash, verify_password, token_hash, valid
 from .geometry import predict, utc, illustrative_track
 from .providers import Providers
 from .notifications import Notifier
+from .acquisition import Acquisition
+from .upgrade import protect_existing_data, record_version
 
 log=logging.getLogger("downrange")
 STATIC=Path(__file__).parent/"static"
@@ -70,6 +72,7 @@ def seed_demo(store):
 def create_app(settings=None):
     settings=settings or Settings()
     settings.data_dir.mkdir(parents=True,exist_ok=True)
+    protect_existing_data(settings.data_dir)
     store=Store(settings.data_dir/"downrange.sqlite3")
     mode="demo" if settings.demo_mode else "live"
     previous=store.meta("installation_mode")
@@ -83,9 +86,11 @@ def create_app(settings=None):
             log.warning("FIRST RUN: username admin; generated password %s . Save it now; change it in Account. It will not be printed again.",password)
     notifier=Notifier(store,settings)
     providers=Providers(store,settings)
+    acquisition=Acquisition(store,settings)
     limiter=Limiter()
     dummy_hash=password_hash(secrets.token_urlsafe(20))
     if settings.demo_mode: seed_demo(store)
+    record_version(store)
 
     async def loop():
         while True:
@@ -97,6 +102,16 @@ def create_app(settings=None):
             except asyncio.CancelledError: raise
             except Exception as exc: log.error("Worker iteration failed: %s",type(exc).__name__)
             await asyncio.sleep(30)
+    async def sources_loop():
+        # Separate task: source network delays must not delay scheduled push.
+        await asyncio.sleep(3)
+        while True:
+            try:
+                await acquisition.refresh()
+            except asyncio.CancelledError: raise
+            except Exception as exc:
+                log.error("Source acquisition failed: %s",type(exc).__name__)
+            await asyncio.sleep(300)
     @asynccontextmanager
     async def lifespan(app):
         lock_file=None
@@ -108,15 +123,20 @@ def create_app(settings=None):
                 lock_file.close()
                 raise RuntimeError("Another Downrange worker uses this appdata. Run one container / one worker.")
         task=asyncio.create_task(loop()) if settings.worker_enabled else None
+        source_task=asyncio.create_task(sources_loop()) if settings.worker_enabled and settings.sources_enabled else None
         try: yield
         finally:
+            if source_task:
+                source_task.cancel()
+                try: await source_task
+                except asyncio.CancelledError: pass
             if task:
                 task.cancel()
                 try: await task
                 except asyncio.CancelledError: pass
             if lock_file: lock_file.close()
     app=FastAPI(title="Downrange",version=__version__,lifespan=lifespan,docs_url=None,redoc_url=None,openapi_url=None)
-    app.state.store=store; app.state.notifier=notifier; app.state.providers=providers; app.state.settings=settings
+    app.state.store=store; app.state.notifier=notifier; app.state.providers=providers; app.state.settings=settings; app.state.acquisition=acquisition
     app.add_middleware(BodyLimit)
 
     @app.middleware("http")
@@ -125,7 +145,12 @@ def create_app(settings=None):
             expected=settings.public_url or str(request.base_url).rstrip("/")
             origin=request.headers.get("origin")
             if request.headers.get("x-downrange")!="1" or (origin and origin!=expected):
-                return JSONResponse({"detail":"Cross-origin or invalid API request"},status_code=403)
+                message = ("Request blocked before password verification. Open Downrange at its configured HTTPS public address, "
+                           "or clear PUBLIC_URL for a direct LAN HTTP test. The scheme, hostname and port must match. "
+                           "Reload the page after changing the container setting.")
+                if request.headers.get("x-downrange")!="1":
+                    message="Required browser request header is missing. Reload Downrange; check that the reverse proxy preserves X-Downrange."
+                return JSONResponse({"detail":message,"code":"origin_mismatch"},status_code=403)
         response=await call_next(request)
         response.headers["X-Content-Type-Options"]="nosniff"
         response.headers["Referrer-Policy"]="no-referrer"
@@ -150,14 +175,14 @@ def create_app(settings=None):
     def launch_for(launch_id):
         row=store.one("SELECT data FROM launches WHERE id=?",(launch_id,))
         if not row: raise HTTPException(404,"Launch not in the current cache")
-        return json.loads(row["data"])
+        return store.hydrate(json.loads(row["data"]))
 
     @app.get("/healthz")
     def health(): return {"ok":True,"version":__version__}
     @app.get("/api/config")
     def config():
         return {"version":__version__,"registration_open":bool(settings.invite_code),"demo_mode":settings.demo_mode,
-                "public_url":settings.public_url,"push_configured":bool(settings.push_subject),"push_library":bool(importlib.util.find_spec("pywebpush")),"vapid_public_key":notifier.public_key}
+                "public_url":settings.public_url,"sources_enabled":settings.sources_enabled,"push_configured":bool(settings.push_subject),"push_library":bool(importlib.util.find_spec("pywebpush")),"vapid_public_key":notifier.public_key}
     @app.post("/api/login")
     def login(body: Credentials,response: Response,request: Request):
         address=request.client.host if request.client else "unknown"
@@ -228,13 +253,13 @@ def create_app(settings=None):
             if not now-600<=utc(launch["net"]).timestamp()<=now+days*86400: continue
             if not launch.get("feed_active"): continue
             pred=calculate(launch,loc,store.track(launch["id"]))
-            results.append({**launch,"prediction":{k:v for k,v in pred.items() if k!="points"}})
+            results.append({**{k:v for k,v in launch.items() if k!="acquisition"},"prediction":{k:v for k,v in pred.items() if k!="points"}})
         feed=store.meta("feed",{})
         return {"launches":results,"feed":feed,"stale":time.time()-feed.get("last_success",0)>1800,"location":loc}
     @app.get("/api/launches/{launch_id}")
     def launch_detail(launch_id:str,location_id:str,user=Depends(auth)):
         launch=launch_for(launch_id); loc=location_for(location_id,user["id"])
-        return {**launch,"prediction":calculate(launch,loc,store.track(launch_id)),"location":loc}
+        return {**{k:v for k,v in launch.items() if k!="acquisition"},"prediction":calculate(launch,loc,store.track(launch_id)),"location":loc}
     @app.get("/api/weather")
     async def weather(launch_id:str,location_id:str,user=Depends(auth)):
         limiter.check(f'weather:{user["id"]}',30,60)
@@ -289,7 +314,7 @@ def create_app(settings=None):
     @app.get("/api/admin/status")
     def status(user=Depends(admin)):
         return {"feed":store.meta("feed",{}),"worker_heartbeat":store.meta("worker_heartbeat"),"accounts":store.one("SELECT COUNT(*) AS n FROM users")["n"],
-                "tracks":store.one("SELECT COUNT(*) AS n FROM tracks")["n"],"demo_mode":settings.demo_mode}
+                "tracks":store.one("SELECT COUNT(*) AS n FROM tracks")["n"],"demo_mode":settings.demo_mode,"acquisition":store.meta("acquisition_status",{}),"flightclub_configured":bool(settings.flightclub_key)}
     @app.get("/api/admin/trajectories/{launch_id}")
     def get_track(launch_id:str,user=Depends(admin)):
         launch_for(launch_id); return store.track(launch_id)

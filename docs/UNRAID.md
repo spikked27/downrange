@@ -1,50 +1,35 @@
-# Unraid installation
+# Unraid GUI updates
 
-## Registry template
+## Existing container
 
-Wait for a successful **Test and publish Downrange** Actions run and make the `downrange` GHCR package public. Then:
+One time: Docker → Downrange icon → Edit → Repository:
 
-```bash
-curl -fsSL --retry 3 https://raw.githubusercontent.com/spikked27/downrange/main/scripts/install-unraid.sh -o /tmp/downrange-install.sh && bash /tmp/downrange-install.sh
+```
+ghcr.io/spikked27/downrange:latest
 ```
 
-Open **Docker -> Add Container -> Template: Downrange**. Administrator username is `admin`. Set a password of at least 12 characters. Default host port: `8097`; appdata: `/mnt/user/appdata/downrange`; app UID/GID: `99:100`. Leave PUBLIC_URL blank for the first LAN-only HTTP test. Apply, open WebUI, and add a saved location. Launch data may take a worker iteration to appear.
+Apply without changing the name, `/data` mapping, host port, PUBLIC_URL or existing settings. This works whether the old repository was a pinned GHCR tag or a local-build image. Do not add another container. No source download, terminal command or local build is required.
 
-The script installs `/boot/config/plugins/dockerMan/templates-user/my-Downrange.xml` after a successful image pull. It preserves an existing template. It does not expose router ports or change other containers. No privileged mode, Docker socket, GPU, or separate database is required.
+After the release has published, reopen WebUI and verify the footer version. Refresh once or close/reopen the installed PWA if an old tab remains. Subsequent releases: Docker → Check for Updates → Update Downrange. These controls check images; clicking the app's Refresh View only refreshes its data, not its software.
 
-## Local-build fallback
+`latest` is a tested alpha update channel. Published exact-version tags remain unchanged. A pinned old version will deliberately stay on that version. GUI image updates do not change the appdata mapping, account database or environment settings.
 
-Download this repository with GitHub's **Code -> Download ZIP**, extract it, and copy the repository contents to `/mnt/user/appdata/downrange-src`. Then:
+## Data preservation and backup
 
-```bash
-cd /mnt/user/appdata/downrange-src
-bash scripts/install-unraid-local.sh
-```
+On application-version changes, a consistent SQLite backup and the persistent VAPID key are saved under `/data/backups/before-<version>/`. With the default mapping this is `/mnt/user/appdata/downrange/backups/`. Backup files contain private account/location/subscription data and require protection. Do not delete appdata or change notification keys during the update. Keep a separate backup of the full appdata folder as usual.
 
-Choose **Downrange-Local** in Add Container. It uses the same default port and appdata; run only one variant. Source can also be cloned with Git where available. `compose.yaml` is supplied for Docker Compose installations, not required by Unraid.
+The first-start ADMIN_PASSWORD setting is not reapplied to an existing account. Continue using the working password. PUBLIC_URL must still match the exact HTTPS origin you open. The newer error explains origin mismatch separately from an invalid password.
 
-## HTTPS and notifications
+To roll back software, stop and edit Repository to an earlier published version (the original is `ghcr.io/spikked27/downrange:0.2.0-alpha.1`). The 0.3 release keeps the same database tables. Do not restore a database while the container runs. For a full data rollback, stop the container, preserve the current database/WAL/SHM files elsewhere, restore the matching snapshot database and key, and start the appropriate version. Do not leave unrelated WAL files alongside a restored snapshot.
 
-Using an existing reverse proxy such as Nginx Proxy Manager, create a dedicated hostname with a valid trusted TLS certificate. Forward it to the Unraid host IP and mapped Downrange port, HTTP upstream. Downrange needs the root of its own hostname, not a subpath. Do not forward the Unraid management interface or Docker API.
+## Defaults and notification setup
 
-Set `PUBLIC_URL` in the template to the exact HTTPS origin, e.g. `https://launch.example.com`, with no path. Apply and sign in through that HTTPS address: cookies become Secure. A certificate alone does not establish remote access; DNS/routing must also reach your reverse proxy. Prefer LAN/VPN exposure during alpha testing rather than unrestricted Internet access.
+Container port 8097, bridge networking, appdata `/mnt/user/appdata/downrange`, PUID/PGID 99:100. The application does not need privileged mode or a Docker socket. Existing settings are compatible with 0.3; automatic trajectory-source acquisition defaults to enabled even if the old template lacks the new variable. No API key is needed for public-source acquisition.
 
-Install/open the PWA on your phone. On iPhone, add it to the home screen before requesting web push. Open Notifications, enable this device, send a test, and confirm receipt. Enable the master schedule switch and choose reminder lead times. Each saved location must also permit alerts. Quiet hours use each location's timezone.
+Flight Club is optional: add variable `FLIGHTCLUB_API_KEY` only with a compatible account/key. Otherwise it should report not configured, not block other sources. Advanced variable `SOURCES_ENABLED=false` disables automatic source acquisition.
 
-Scenario alerts require opting into experimental estimates. Unknown-path candidates require a separate opt-in and do not provide a known viewing direction. No updates are based on closed-app GPS. Weather does not gate alerts yet.
+Phone push needs HTTPS at a dedicated hostname, not a subpath. Use your existing reverse proxy with HTTP upstream to the Unraid IP and mapped app port. Do not expose the Unraid management interface. Register each device in Notifications, send a test, enable the master schedule switch and per-location alerts. Estimated-path alerts need estimate opt-in; broad low-information cases additionally need candidate opt-in. Alerts use saved locations, not closed-app GPS.
 
-## Updates and backup
+## New installations
 
-The initial image tag is versioned. Future releases require selecting their published tag/template; blindly clicking Update does not move a pinned version to a new version. Stop the container and back up the full appdata directory, including the SQLite database and `vapid-private.pem`. Restore it before restart. Do not change notification keys unless willing to re-register devices. Do not mix demo and live appdata.
-
-A bootstrap ADMIN_PASSWORD is used only when the database is first created. Change it inside Account thereafter. To recover a lost administrator password locally:
-
-```bash
-docker exec -it --user 99:100 Downrange python -m app.reset_password
-```
-
-Use `Downrange-Local` instead when that is your container name. This resets the admin password and revokes existing admin sessions.
-
-## Troubleshooting
-
-Registry denied: verify the image exists and its package visibility is Public, or use the local-build template. Port conflict: change only the host-side port. Login fails after setting PUBLIC_URL: use the matching HTTPS address. No launch reminders: check master switch, device subscription, per-location setting, estimate opt-in, quiet hours, fresh provider data, precise launch time, eligible launch status, and an actual modeled opportunity. A provider cache can be stale even while the container health check is green.
+The registry template in `templates/downrange.xml` and `scripts/install-unraid.sh` use latest. The script adds a template without creating containers or overwriting existing settings. The separate local-build scripts remain developer fallbacks, not the normal upgrade path. Container package visibility must be Public for anonymous pulls; the release workflow verifies this after publication.

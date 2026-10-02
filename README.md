@@ -2,43 +2,55 @@
 
 **The launch isn't local. The view might be.**
 
-Self-hosted rocket-launch visibility research, sunlit-plume / space-jellyfish geometry, and browser push notifications. Mobile-first installable web app; Docker and Unraid templates included.
+A self-hosted, multi-location launch-viewing and space-jellyfish research app with browser push. Version **0.3.0-alpha.2** integrates automatic public-source acquisition and introduces Unraid GUI updates.
 
-## Status: 0.2.0-alpha.1
+## Update an existing Unraid installation — no terminal required
 
-This is a working research alpha, **not a validated naked-eye visibility forecast**. Selected Falcon 9 missions have automatic, explicitly hypothetical flight-path scenarios. Unknown missions stay unknown. Imported mission-specific trajectories override estimates. No real mission trajectory provider or historical sighting calibration is connected yet.
+Open **Docker → Downrange icon → Edit**. Change **Repository** to:
 
-## Included
+```
+ghcr.io/spikked27/downrange:latest
+```
 
-- Private accounts and up to ten saved locations per account, anywhere in the world; town search, coordinates, foreground GPS, local timezones, adjustable horizon limits.
-- Centrally cached launch schedule and status, separate powered-night and sunlit-plume geometry, viewing windows, true compass directions, and a sky-path chart.
-- Experimental automatic scenario sets for selected Florida/Vandenberg Falcon 9 missions. The optimistic union can produce false positives; counts are not probabilities.
-- Administrator trajectory JSON import and explicitly hypothetical heading scenarios.
-- Observer-grid cloud forecasts, kept separate from geometric opportunity.
-- Server-side reminder scheduling, quiet hours, stale-feed suppression, reschedule notices, persistent push subscriptions and delivery-attempt history. Estimated/candidate alerts are opt-in.
-- One container, SQLite appdata, unprivileged application process, persistent notification keys, and two Unraid templates.
+Keep the same container name, appdata mapping, port, PUBLIC_URL, password, and other settings. Click **Apply**, then reopen WebUI. The footer should show **0.3.0-alpha.2** once that release's workflow has succeeded. This first change moves an old pinned-version/local-build installation onto the update channel. Future releases use **Docker → Check for Updates → Update**. Do not add a second container or delete appdata.
 
-## Install on Unraid
+`latest` means the current tested **alpha**, not production-stable forecasting. Exact version tags remain available for rollback. The workflow promotes latest only from current main, after tests, fresh-container checks, and an actual old-image upgrade test. It also checks anonymous registry access. Check Actions for the actual build outcome.
 
-After the Actions workflow has published the image and the GHCR package is public, run in the Unraid host terminal:
+Before changing application version, Downrange creates a consistent SQLite snapshot and copies the notification key into `/data/backups/before-<new-version>/`. This does not replace a separate host backup. Existing credentials, locations, preferences, and push subscriptions are reused. A new ADMIN_PASSWORD environment value is not a password reset.
+
+## Automatic prediction inputs
+
+Every provider/vehicle in the cached schedule with usable pad coordinates enters the evaluator. There is no Falcon-9-only gate. That is not a promise of equally good evidence for all missions.
+
+- Launch Library 2 supplies the paginated schedule, pads, vehicles and mission information, under a persistent request budget.
+- Next Spaceflight public mission pages and the Jellyfish site's available heading metadata supply matched departure directions when available.
+- Linked recognized operator/agency pages are checked for explicitly stated flight directions.
+- Historical webcast-derived Falcon-family ascent analogues are fetched automatically. A previous flight is never relabeled as current telemetry.
+- Flight Club simulation acquisition is optional with a suitable `FLIGHTCLUB_API_KEY`; no purchase or key is included. Authenticated access remains unverified without a key.
+
+Sources are cached and checked separately from the notification worker. Mission identity, date, coordinates and source provenance matter. The viewing brief includes source evidence and distinguishes simulations, historical analogues and broad assumptions. Manual trajectory imports take precedence. See [sources and limits](docs/SOURCES.md) and [model](docs/MODEL.md).
+
+## Locations and notifications
+
+Private accounts, up to ten saved locations each, town search, coordinates, foreground device location, per-location timezones and horizon cutoffs. Separate powered-night and sunlit-plume intervals, a sky-path chart, observer-grid cloud forecasts, and persistent server-side push reminders.
+
+HTTPS is required for phone push. Keep the exact working `PUBLIC_URL`. Enable this device, master scheduled alerts, and per-location alerts. Inferred-path reminders require **Include experimental estimated trajectories**. Broad low-information cases also require **Include broad / low-information candidates**. Quiet hours and stale/uncertain launch times suppress alerts. Send a test and verify actual receipt on the phone; server acceptance is not proof of delivery.
+
+## New Unraid install
+
+Use [templates/downrange.xml](templates/downrange.xml), which points to latest. The optional one-time installer is:
 
 ```bash
 curl -fsSL --retry 3 https://raw.githubusercontent.com/spikked27/downrange/main/scripts/install-unraid.sh -o /tmp/downrange-install.sh && bash /tmp/downrange-install.sh
 ```
 
-Then **Docker -> Add Container -> Template: Downrange**. Set a 12+ character administrator password, keep port **8097** unless occupied, review `/mnt/user/appdata/downrange`, and Apply. Sign in as `admin` using the configured password. Add your own location.
+Then Docker → Add Container → Downrange. Default port 8097; appdata `/mnt/user/appdata/downrange`; username `admin`; choose a 12+ character bootstrap password. HTTPS may be configured after the initial LAN test. This is a saved template, not a Community Applications listing. See [Unraid guide](docs/UNRAID.md).
 
-The installer pulls the versioned image and adds a saved template; it does not create/change containers or overwrite existing template settings. This is not a Community Applications listing.
+## Validation and remaining work
 
-**Registry denied or image missing?** Check the workflow first. A public repository does not automatically make its container package public. Repository page -> Packages -> downrange -> Package settings -> Change visibility -> Public. Alternatively download/clone this source and run `bash scripts/install-unraid-local.sh`; choose **Downrange-Local** instead. Do not run both against the same appdata.
+135 automated local tests passed for the integrated release preparation. CI separately tests the published predecessor image's data surviving container replacement. Do not infer CI success from this paragraph: see the repository's Actions run and [validation record](docs/VALIDATION.md).
 
-See [the full Unraid guide](docs/UNRAID.md) for HTTPS, backup, recovery, and the local-build fallback.
-
-## Phone notifications
-
-The website can be inspected on LAN HTTP. Phone push needs a working HTTPS origin. Configure a reverse proxy, set `PUBLIC_URL` to that exact HTTPS origin, reopen that address, install the PWA, and register the device in Notifications. Then enable scheduled alerts and select rules. Send a test and check that it arrives on the phone; a queued message or provider acceptance is not proof of device receipt.
-
-No background location tracking. Alerts use saved locations. Estimated trajectories and unknown-path candidates are excluded by default. Without imported trajectories, enable **experimental estimated trajectories** to receive scenario-based alerts, understanding their limitations.
+This remains a research alpha. Generic trajectories are estimates, not vehicle performance certification. No calibrated detection probabilities, comprehensive NOTAM/NAVWARN/PDF ingestion, terrain model, line-of-sight cloud integration, universal later-burn/daylight coverage, or historically validated sighting accuracy yet. Weather is shown separately and does not gate alerts. Upstream feeds may omit unannounced or some suborbital flights. No app-store release or background GPS tracking.
 
 ## Development
 
@@ -48,17 +60,8 @@ python -m venv .venv
 pip install -r requirements-dev.txt
 python -m pytest -q
 node --check app/static/app.js
+node --check app/static/sources-ui.js
 node --check app/static/sw.js
 ```
 
-For a live local server, configure `DATA_DIR` and a bootstrap `ADMIN_PASSWORD`, then run `uvicorn app.server:app --host 127.0.0.1 --port 8097`. Use one process/worker per appdata directory. `DEMO_MODE=true` creates clearly labeled fictional data and disables real push; use separate demo appdata.
-
-The Actions workflow tests, builds Linux amd64, smoke-tests container startup, data permissions, and key persistence, then publishes `ghcr.io/spikked27/downrange:0.2.0-alpha.1` and an exact-commit image tag. See Actions for the actual build result, not just this README.
-
-## Limitations and privacy
-
-Read [MODEL.md](docs/MODEL.md), [SECURITY.md](docs/SECURITY.md), and [VALIDATION.md](docs/VALIDATION.md). No brightness probabilities, terrain, trajectory doglegs, line-of-sight cloud integration, ground-track map, camera/AR view, or native app-store packages. No guaranteed live launch status or notification receipt. Do not rely on this app for safety or navigation.
-
-Launch data: [TheSpaceDevs / Launch Library 2](https://thespacedevs.com/llapi). Forecast and geocoding: [Open-Meteo](https://open-meteo.com/) / [GeoNames](https://www.geonames.org/). Check provider licenses and usage limits before public/commercial operation. Location searches and rounded forecast coordinates leave the self-hosted server; accounts, preferences, and subscriptions are stored locally. No analytics trackers.
-
-MIT licensed application source. Third-party dependencies and data retain their own licenses. Not affiliated with launch providers or the inspiration website.
+Single worker/container per appdata. Use separate appdata for `DEMO_MODE=true`. No privileged mode, Docker socket, or additional database service is required. MIT source license; third-party data and dependencies retain their terms. Protect appdata and backups; see [security](docs/SECURITY.md). Not affiliated with launch providers or the inspiration site.

@@ -31,9 +31,10 @@ def quiet(now,loc,prefs):
 
 
 def eligible(launch,loc,pred,prefs):
-    if not launch.get("feed_active") or launch.get("demo") or not launch.get("time_precise") or not loc.get("alerts"): return False
+    if (launch.get("feed_seen") is not None and time.time()-launch["feed_seen"]>1800) or not launch.get("feed_active") or launch.get("demo") or not launch.get("time_precise") or not loc.get("alerts"): return False
     if launch.get("status","").lower() not in {"go","tbc"}: return False
     if not pred["candidate"]: return False
+    if pred.get("low_information") and not prefs.include_candidates: return False
     if pred["mode"]=="screening": return prefs.include_candidates and not prefs.jellyfish_only
     if pred["confidence"]=="estimated" and not prefs.include_estimates: return False
     return bool(pred["jellyfish_windows"]) if prefs.jellyfish_only else bool(pred["ordinary_windows"] or pred["jellyfish_windows"])
@@ -95,7 +96,7 @@ class Notifier:
                     first=utc(windows[0]["start"]).timestamp() if windows else net
                     leads=[lead for lead in prefs.lead_minutes if 0<=now-(first-lead*60)<120 and first>now]
                     if not leads: continue
-                    lead=min(leads)  # No stack of stale/catch-up reminders.
+                    lead=min(leads)
                     if pred["mode"]=="screening":
                         title="Uncertain launch candidate"
                         body=f'{loc["name"]}: {launch["name"]}. Liftoff is scheduled in ~{round((net-now)/60)} min. NO trajectory: visibility and viewing direction are unknown.'
@@ -107,8 +108,6 @@ class Notifier:
     def send_one(self,subscription,payload,ttl):
         from pywebpush import webpush
         validate_push_endpoint(subscription["endpoint"])
-        # Requests follows redirects by default; block redirects even from an
-        # allowlisted service. Never forward a push payload to an arbitrary host.
         import requests
         class NoRedirectSession(requests.Session):
             def request(self,*args,**kwargs):

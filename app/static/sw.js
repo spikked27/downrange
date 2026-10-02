@@ -1,11 +1,10 @@
 'use strict';
-const CACHE='downrange-shell-0.2.0-alpha.1';
-const SHELL=['/','/static/styles.css','/static/app.js','/static/icon.svg','/static/icon-192.png','/static/icon-512.png','/manifest.webmanifest'];
+const CACHE='downrange-shell-0.3.0-alpha.2';
+const SHELL=['/','/static/styles.css','/static/app.js','/static/sources-ui.js','/static/icon.svg','/static/icon-192.png','/static/icon-512.png','/manifest.webmanifest'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)));self.skipWaiting();});
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('downrange-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
   const u=new URL(event.request.url);
-  // Never cache private API results, locations, credentials or launch forecasts.
   if(event.request.method!=='GET'||u.origin!==self.location.origin||u.pathname.startsWith('/api/')||!SHELL.includes(u.pathname))return;
   event.respondWith(fetch(event.request).then(response=>{if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(c=>c.put(event.request,copy)));}return response;}).catch(()=>caches.match(event.request).then(r=>r||Response.error())));
 });

@@ -7,7 +7,10 @@ from app.notifications import quiet,eligible,ensure_vapid
 from app.geometry import screen
 
 @pytest.fixture
-def context(app,loaded_launch,location):
+def context(app,loaded_launch,location,monkeypatch):
+    # Isolate outbox tests from the global ascent model and wall-clock daylight.
+    from app.geometry import screen
+    monkeypatch.setattr("app.notifications.predict",lambda launch,loc,track:screen(launch,loc))
     now=float(int(time.time()))
     loaded_launch['net']=datetime.fromtimestamp(now+15*60,timezone.utc).isoformat()
     store=app.state.store

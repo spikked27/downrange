@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, sqlite3
+import json, sqlite3, time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -40,8 +40,16 @@ class Store:
         r=self.one("SELECT value FROM meta WHERE key=?",(key,)); return json.loads(r["value"]) if r else default
     def set_meta(self,key,value):
         self.execute("INSERT INTO meta VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(key,json.dumps(value)))
-    def launches(self):
-        return sorted([json.loads(r["data"]) for r in self.rows("SELECT data FROM launches")],key=lambda x:x["net"])
+    def hydrate(self, launch):
+        from .acquisition import identity
+        result=dict(launch)
+        acquired=self.meta('acquired:'+launch['id'],{})
+        if acquired.get('identity')==identity(launch) and acquired.get('valid_until',0)>time.time():
+            result['acquisition']=acquired
+        return result
+    def launches(self, hydrate=True):
+        rows=[json.loads(r["data"]) for r in self.rows("SELECT data FROM launches")]
+        return sorted([self.hydrate(r) if hydrate else r for r in rows],key=lambda x:x['net'])
     def track(self,launch_id):
         r=self.one("SELECT data FROM tracks WHERE launch_id=?",(launch_id,)); return json.loads(r["data"]) if r else None
     def locations(self,user_id):

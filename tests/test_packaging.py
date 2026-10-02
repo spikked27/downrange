@@ -11,7 +11,8 @@ def test_unraid_templates_version_port_and_permissions():
         root=ET.parse(file).getroot()
         assert root.attrib['version']=='2'
         assert root.findtext('Privileged')=='false'
-        assert __version__ in root.findtext('Repository')
+        assert (root.findtext('Repository') == 'ghcr.io/spikked27/downrange:latest'
+                if file.name == 'downrange.xml' else __version__ in root.findtext('Repository'))
         assert '[PORT:8097]' in root.findtext('WebUI')
         configs=root.findall('Config')
         assert any(c.attrib['Target']=='/data' for c in configs)

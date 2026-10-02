@@ -11,7 +11,7 @@ from conftest import HEADERS,PASSWORD,INVITATION
 def test_health_and_private_default(client):
     assert client.get('/healthz').status_code==200
     assert client.get('/api/locations').status_code==401
-    assert client.get('/api/config').json()['version']=='0.2.0-alpha.1'
+    assert client.get('/api/config').json()['version']=='0.3.0-alpha.2'
 
 def test_csrf_headers_and_origin(client):
     creds={'username':'admin','password':PASSWORD}
@@ -71,7 +71,8 @@ def test_payload_limit(admin):
 def test_forecast_and_scenario_import(admin,app,location,loaded_launch):
     lid=admin.post('/api/locations',json=location).json()['id']
     r=admin.get('/api/launches',params={'location_id':lid});assert r.status_code==200,r.text
-    assert r.json()['launches'][0]['prediction']['mode']=='screening'
+    assert r.json()['launches'][0]['prediction']['mode']=='trajectory'
+    assert r.json()['launches'][0]['prediction']['confidence']=='estimated'
     url=f'/api/admin/trajectories/{loaded_launch["id"]}'
     assert admin.post(url+'/scenario',json={'heading_deg':40}).status_code==200
     track=admin.get(url).json()

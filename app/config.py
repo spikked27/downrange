@@ -14,6 +14,8 @@ class Settings:
     poll_seconds: int=field(default_factory=lambda:max(600,int(os.getenv("POLL_SECONDS","600"))))
     worker_enabled: bool=field(default_factory=lambda:os.getenv("WORKER_ENABLED","true").lower()=="true")
     demo_mode: bool=field(default_factory=lambda:os.getenv("DEMO_MODE","false").lower()=="true")
+    sources_enabled: bool=field(default_factory=lambda:os.getenv("SOURCES_ENABLED","true").lower()=="true")
+    flightclub_key: str=field(default_factory=lambda:os.getenv("FLIGHTCLUB_API_KEY",""))
     def __post_init__(self):
         self.data_dir=Path(self.data_dir)
         if self.public_url:
