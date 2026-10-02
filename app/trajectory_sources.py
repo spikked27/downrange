@@ -22,7 +22,19 @@ def history_candidates(catalog,launch):
     elif 'transfer' in text or 'geostationary' in text: targets=['SES-9','Thaicom 8']
     elif 'international space station' in text or 'crew' in text or 'crs' in text: targets=['DM-1','SpaceX CRS-8']
     else: targets=['Orbcomm OG2','DM-1']
-    rows=[r for r in catalog if r.get('analysed_stage')==2 and r.get('mission_name') in targets]
+    rows=[]
+    for entry in catalog:
+        if not isinstance(entry,dict) or entry.get('analysed_stage')!=2 or entry.get('mission_name') not in targets:
+            continue
+        row={**entry,'JSON':dict(entry.get('JSON') or {})}
+        # Verified against this archive directory on 2026-10-02: the catalogue
+        # points at nonexistent analysed2.json; the actual file is analysed.json.
+        # Correct only this exact known link, not arbitrary source paths.
+        old='https://raw.githubusercontent.com/shahar603/Telemetry-Data/master/SpaceX%20CRS-8/JSON/analysed2.json'
+        if row['mission_name']=='SpaceX CRS-8' and row['JSON'].get('analysed')==old:
+            row['JSON']['analysed']=old.replace('/analysed2.json','/analysed.json')
+            row['catalog_note']='Known CRS-8 catalogue link corrected to the verified archive file.'
+        rows.append(row)
     return sorted(rows,key=lambda r:targets.index(r['mission_name']))[:2]
 
 def historical_profile(data,events,name,url):
@@ -78,7 +90,6 @@ def flightclub_tracks(payload,launch_id):
         segment=[];last=None
         def finish():
             if len(segment)<2:return
-            # Thin to <=5-second spacing while preserving power transitions.
             selected=[segment[0]]
             for i,p in enumerate(segment[1:-1],1):
                 if p['t_s']-selected[-1]['t_s']>=5 or p['powered']!=segment[i-1]['powered'] or p['powered']!=segment[i+1]['powered']:
