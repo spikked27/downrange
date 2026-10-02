@@ -1,0 +1,11 @@
+{
+  "source": "SYNTHETIC FORMAT EXAMPLE - not a real flight path",
+  "source_url": "",
+  "kind": "estimated",
+  "notes": "Format demonstration only. Never import this as mission-specific data.",
+  "points": [
+    {"t_s": 0, "latitude": 28.5, "longitude": -80.6, "altitude_km": 0, "powered": true, "plume": false},
+    {"t_s": 60, "latitude": 28.6, "longitude": -80.5, "altitude_km": 10, "powered": true, "plume": true},
+    {"t_s": 120, "latitude": 28.8, "longitude": -80.3, "altitude_km": 40, "powered": true, "plume": true}
+  ]
+}
