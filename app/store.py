@@ -41,11 +41,11 @@ class Store:
     def set_meta(self,key,value):
         self.execute("INSERT INTO meta VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",(key,json.dumps(value)))
     def hydrate(self, launch):
-        from .acquisition import identity
-        result=dict(launch)
-        acquired=self.meta('acquired:'+launch['id'],{})
-        if acquired.get('identity')==identity(launch) and acquired.get('valid_until',0)>time.time():
-            result['acquisition']=acquired
+        from .evidence import usable
+        result = dict(launch)
+        acquired = usable(self.meta('acquired:'+launch['id'], {}), launch)
+        if acquired:
+            result['acquisition'] = acquired
         return result
     def launches(self, hydrate=True):
         rows=[json.loads(r["data"]) for r in self.rows("SELECT data FROM launches")]

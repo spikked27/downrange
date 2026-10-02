@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 from urllib.parse import urlencode
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
-from .geometry import utc, predict
+from .geometry import utc
+from .prediction_cache import predict
 from .models import Preferences
 from .security import validate_push_endpoint
 
@@ -30,8 +31,9 @@ def quiet(now,loc,prefs):
     return start<=hour<end if start<end else hour>=start or hour<end
 
 
-def eligible(launch,loc,pred,prefs):
-    if (launch.get("feed_seen") is not None and time.time()-launch["feed_seen"]>1800) or not launch.get("feed_active") or launch.get("demo") or not launch.get("time_precise") or not loc.get("alerts"): return False
+def eligible(launch,loc,pred,prefs,now=None):
+    now=time.time() if now is None else now
+    if (launch.get("feed_seen") is not None and now-launch["feed_seen"]>1800) or not launch.get("feed_active") or launch.get("demo") or not launch.get("time_precise") or not loc.get("alerts"): return False
     if launch.get("status","").lower() not in {"go","tbc"}: return False
     if not pred["candidate"]: return False
     if pred.get("low_information") and not prefs.include_candidates: return False
@@ -46,7 +48,7 @@ class Notifier:
     def queue(self,user_id,subs,event,launch_id,loc_id,net,kind,payload,now,expires):
         for sub in subs:
             key=hashlib.sha256(f'{event}|{sub["id"]}'.encode()).hexdigest()
-            self.store.execute("INSERT OR IGNORE INTO deliveries(key,user_id,subscription_id,launch_id,location_id,net,kind,payload,next_try,expires) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            self.store.execute("INSERT INTO deliveries(key,user_id,subscription_id,launch_id,location_id,net,kind,payload,next_try,expires) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET status='pending',payload=excluded.payload,next_try=excluded.next_try,expires=excluded.expires,error=NULL WHERE deliveries.status IN ('cancelled','expired') AND deliveries.attempts<3",
                                (key,user_id,sub["id"],launch_id,loc_id,net,kind,json.dumps(payload),now,expires))
     def plan(self,now=None):
         now=time.time() if now is None else now
@@ -73,7 +75,7 @@ class Notifier:
                 launch=launches.get(item["launch_id"]); loc=locations.get(item["location_id"])
                 pred=current(item["launch_id"],item["location_id"])
                 valid=(prefs.enabled and fresh and launch and loc and loc["alerts"] and launch["net"]==item["net"] and not quiet(now,loc,prefs))
-                if item["kind"]=="reminder": valid=valid and eligible(launch,loc,pred,prefs)
+                if item["kind"]=="reminder": valid=valid and eligible(launch,loc,pred,prefs,now)
                 elif item["kind"]=="change": valid=valid and prefs.schedule_changes
                 if not valid: self.store.execute("UPDATE deliveries SET status='cancelled' WHERE key=?",(item["key"],))
             if not prefs.enabled or not fresh or not subs: continue
@@ -91,7 +93,7 @@ class Notifier:
                             self.queue(user["id"],subs,f'change|{launch["id"]}|{loc["id"]}|{state}',launch["id"],loc["id"],launch["net"],"change",{"title":"Launch schedule changed","body":body[:800],"tag":f'change-{launch["id"]}',"url":"/"},now,now+600)
                     if net<now-600 or net>now+2*86400: continue
                     pred=current(launch["id"],loc["id"])
-                    if not eligible(launch,loc,pred,prefs): continue
+                    if not eligible(launch,loc,pred,prefs,now): continue
                     windows=pred["jellyfish_windows"] if prefs.jellyfish_only else sorted(pred["ordinary_windows"]+pred["jellyfish_windows"],key=lambda w:w["start"])
                     first=utc(windows[0]["start"]).timestamp() if windows else net
                     leads=[lead for lead in prefs.lead_minutes if 0<=now-(first-lead*60)<120 and first>now]
@@ -127,6 +129,8 @@ class Notifier:
             sub=self.store.one("SELECT data FROM subscriptions WHERE id=? AND user_id=?",(item["subscription_id"],item["user_id"]))
             if not sub:
                 self.store.execute("UPDATE deliveries SET status='cancelled' WHERE key=?",(item["key"],)); continue
+            current = self.store.one("SELECT status FROM deliveries WHERE key=?", (item["key"],))
+            if not current or current["status"] != "pending": continue
             try:
                 sender(json.loads(sub["data"]),json.loads(item["payload"]),max(1,int(item["expires"]-now)))
                 self.store.execute("UPDATE deliveries SET status='sent',error=NULL,next_try=? WHERE key=?",(now,item["key"]))

@@ -19,7 +19,7 @@ function renderSourceEvidence() {
   };
   section.innerHTML = `<h3>Automatic source evidence</h3>
     <p class="small"><strong>${esc(p.evidence_level || 'estimated')}</strong><br>
-    Last acquisition: ${esc(fmt(p.source_checked))}</p>
+    Last research attempt: ${esc(fmt(p.source_checked))}</p>
     ${(p.source_evidence || []).map(e => `<p class="small">${safeLink(e.url, e.source)} · ${Number(e.heading_deg).toFixed(1)}° departure heading<br>${esc(e.note)}</p>`).join('')}
     ${(p.historical_analogues || []).map(h => `<p class="small">Historical ascent: ${safeLink(h.url, h.name)}. This is a different flight, used as an analogue.</p>`).join('')}
     ${!p.source_evidence?.length ? '<p class="small">No matched published departure direction yet. Orbital/site assumptions or a broad envelope are in use.</p>' : ''}
@@ -51,7 +51,7 @@ new MutationObserver(() => {
   });
 }).observe(launchCards, { childList: true });
 
-const OBSERVER_ASSET_VERSION='0.3.2-alpha.1';
+const OBSERVER_ASSET_VERSION='1.0.0-alpha.1';
 let observerAssets,observerCleanup,observerSlider,pendingObserverSlider,observerGeneration=0;
 function loadObserverAssets(){
   if(observerAssets)return observerAssets;

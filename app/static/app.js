@@ -6,7 +6,7 @@ const state = {config:null,user:null,locations:[],launches:[],location:null,page
 let toastTimer;
 function toast(message,error=false){$('#toast').textContent=message;$('#toast').classList.toggle('error-toast',error);$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,7000);}
 async function api(path,method='GET',body){
-  const opts={method,credentials:'same-origin',headers:{'X-Downrange':'1'}};
+  const opts={method,credentials:'same-origin',headers:{'X-Downrange':'1'},cache:'no-store'};
   if(body!==undefined){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
   const r=await fetch('/api'+path,opts);let data;try{data=await r.json();}catch{throw new Error('Server returned an unreadable response');}
   if(!r.ok){let m=data.detail;if(Array.isArray(m))m=m.map(x=>`${x.loc.slice(1).join('.')}: ${x.msg}`).join('; ');throw new Error(m||`Request failed (${r.status})`);}
@@ -48,10 +48,10 @@ async function loadLocations(){
 }
 function editLocation(id){
   const l=state.locations.find(x=>x.id===id);if(!l)return;
-  $('#locationId').value=l.id;$('#locName').value=l.name;$('#locLat').value=l.latitude;$('#locLon').value=l.longitude;$('#locAlt').value=l.elevation_m;$('#locMin').value=l.min_elevation_deg;$('#locTz').value=l.timezone;$('#locAlerts').checked=l.alerts;
+  $('#locationId').value=l.id;$('#locName').value=l.name;$('#locLat').value=l.latitude;$('#locLon').value=l.longitude;$('#locAlt').value=l.elevation_m;$('#locMin').value=l.min_elevation_deg;$('#locTz').value=l.timezone;$('#locAlerts').checked=l.alerts;window.DownrangeV1?.fillHorizon(l.horizon_profile||[]);
   $('#locationFormTitle').textContent='Edit viewing location';$('#cancelEdit').hidden=false;setPage('locations');$('#locName').focus();
 }
-function resetLocationForm(){ $('#locationForm').reset();$('#locationId').value='';$('#locationFormTitle').textContent='Add a location';$('#cancelEdit').hidden=true;$('#locTz').value=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}
+function resetLocationForm(){ $('#locationForm').reset();window.DownrangeV1?.fillHorizon([]);$('#locationId').value='';$('#locationFormTitle').textContent='Add a location';$('#cancelEdit').hidden=true;$('#locTz').value=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';}
 function fillPlace(p){$('#locName').value=p.name;$('#locLat').value=p.latitude;$('#locLon').value=p.longitude;$('#locAlt').value=p.elevation_m??0;$('#locTz').value=p.timezone||tz();$('#searchResults').innerHTML='';}
 async function searchPlaces(){const q=$('#placeSearch').value.trim();if(q.length<2)throw new Error('Enter at least two characters');$('#searchButton').disabled=true;try{const places=await api('/geocode?q='+encodeURIComponent(q));$('#searchResults').innerHTML=places.map((p,i)=>`<button type="button" class="search-result" data-place="${i}">${esc(p.name)}<small>${esc(p.region)}</small></button>`).join('')||'<p class="small muted">No places found. Try a different name or use coordinates.</p>';$$('[data-place]').forEach(b=>b.onclick=()=>fillPlace(places[Number(b.dataset.place)]));}finally{$('#searchButton').disabled=false;}}
 async function loadFeed(){
@@ -69,12 +69,13 @@ async function loadFeed(){
     $('#statModeled').textContent=state.launches.filter(l=>Boolean(l.prediction.viewing_plan?.first)).length;
     $('#statJelly').textContent=state.launches.filter(l=>l.prediction.jellyfish_windows.length).length;
     $('#statHorizon').textContent=state.location.min_elevation_deg+'°';
-    renderCards();renderSourceStatus();
+    renderCards();renderSourceStatus();document.dispatchEvent(new Event("downrange:feed"));
   }finally{if(request===state.feedRequest)$('#refreshButton').disabled=false;}
 }
 function renderCards(){
   const filter=$('#feedFilter').value;
   let list=state.launches.filter(l=>filter==='all'||(filter==='candidates'&&l.prediction.candidate)||(filter==='modeled'&&Boolean(l.prediction.viewing_plan?.first))||(filter==='jellyfish'&&l.prediction.jellyfish_windows.length));
+  if(window.DownrangeV1)list=list.filter(l=>DownrangeV1.selected(l,$('#launchSearch')?.value||'', $('#qualityFilter')?.value||'all'));
   list.sort((a,b)=>Number(Boolean(a.prediction.low_information))-Number(Boolean(b.prediction.low_information))||new Date(a.net)-new Date(b.net));
   if(!list.length){$('#launchCards').innerHTML=`<div class="empty"><h3>${state.location?'No matching opportunities in this cached feed.':'Give your sky a starting point.'}</h3><p>${state.location?'This is not an all-clear on the sky. Try “All cached launches,” extend the date range, or check whether the feed and mission trajectories are available.':'Save a town or coordinates anywhere in the world to begin.'}</p>${!state.location?'<button class="primary" id="emptyAddLocation">Add a viewing location</button>':''}</div>`;if($('#emptyAddLocation'))$('#emptyAddLocation').onclick=()=>setPage('locations');return;}
   $('#launchCards').innerHTML=list.map((l,i)=>{
@@ -157,7 +158,7 @@ $('#locationSelect').onchange=run(async e=>{state.location=state.locations.find(
 $('#refreshButton').onclick=run(loadFeed);$('#feedFilter').onchange=renderCards;$('#daysSelect').onchange=run(loadFeed);
 $('#searchButton').onclick=run(searchPlaces);$('#placeSearch').onkeydown=run(async e=>{if(e.key==='Enter'){e.preventDefault();await searchPlaces();}});
 $('#gpsButton').onclick=run(async()=>{if(!window.isSecureContext)throw new Error('Device location needs HTTPS. You can enter coordinates manually.');if(!navigator.geolocation)throw new Error('Geolocation is unavailable');const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:15000,maximumAge:60000,enableHighAccuracy:false}));$('#locLat').value=pos.coords.latitude.toFixed(6);$('#locLon').value=pos.coords.longitude.toFixed(6);$('#locName').value=$('#locName').value||'Current location';$('#locTz').value=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';toast('Coordinates filled. Check the location timezone and save.');});
-$('#locationForm').onsubmit=run(async e=>{e.preventDefault();const id=$('#locationId').value;const body={name:$('#locName').value,latitude:Number($('#locLat').value),longitude:Number($('#locLon').value),elevation_m:Number($('#locAlt').value),min_elevation_deg:Number($('#locMin').value),timezone:$('#locTz').value,alerts:$('#locAlerts').checked};const l=await api('/locations'+(id?'/'+id:''),id?'PUT':'POST',body);state.location=l;await loadLocations();resetLocationForm();await loadFeed();toast('Viewing location saved');setPage('dashboard');});
+$('#locationForm').onsubmit=run(async e=>{e.preventDefault();const id=$('#locationId').value;const body={name:$('#locName').value,latitude:Number($('#locLat').value),longitude:Number($('#locLon').value),elevation_m:Number($('#locAlt').value),min_elevation_deg:Number($('#locMin').value),timezone:$('#locTz').value,alerts:$('#locAlerts').checked,horizon_profile:window.DownrangeV1?.horizon()||[]};const l=await api('/locations'+(id?'/'+id:''),id?'PUT':'POST',body);state.location=l;await loadLocations();resetLocationForm();await loadFeed();toast('Viewing location saved');setPage('dashboard');});
 $('#cancelEdit').onclick=resetLocationForm;
 $('#preferencesForm').onsubmit=run(async e=>{e.preventDefault();const leads=$('#leadMinutes').value.split(',').map(v=>Number(v.trim()));if(leads.some(v=>!Number.isInteger(v)))throw new Error('Reminder times must be whole numbers');await api('/preferences','PUT',{enabled:$('#alertsEnabled').checked,lead_minutes:leads,include_candidates:$('#includeCandidates').checked,include_estimates:$('#includeEstimates').checked,jellyfish_only:$('#jellyOnly').checked,schedule_changes:$('#scheduleChanges').checked,quiet_start:$('#quietStart').value===''?null:Number($('#quietStart').value),quiet_end:$('#quietEnd').value===''?null:Number($('#quietEnd').value)});toast('Alert preferences saved');});
 $('#enablePush').onclick=run(enablePush);$('#testPush').onclick=run(async()=>{const d=await api('/push/test','POST');toast(d.message);await refreshPushStatus();});$('#refreshPush').onclick=run(refreshPushStatus);
@@ -170,7 +171,7 @@ $('#closeDetail').onclick=()=>$('#detailDialog').close();$('#detailDialog').addE
 
 // Refresh visible feed data automatically; never auto-change preferences or device permissions.
 setInterval(()=>{
-  if(!document.hidden&&state.user&&state.page==='dashboard'&&!$('#detailDialog').open&&!$('#refreshButton').disabled)
+  if(!document.hidden&&state.user&&['dashboard','sources'].includes(state.page)&&!$('#detailDialog').open&&!$('#refreshButton').disabled)
     loadFeed().catch(e=>toast(e.message,true));
 },60000);
 $('#detailDialog').addEventListener('close',()=>{state.timelineCleanup?.();state.timelineCleanup=null;state.detail=null;});

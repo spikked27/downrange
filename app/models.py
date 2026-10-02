@@ -7,11 +7,13 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_strip_whitespace=True)
 
 class Credentials(StrictModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_strip_whitespace=False)
     username: str = Field(min_length=3, max_length=40, pattern=r"^[A-Za-z0-9_.-]+$")
     password: str = Field(min_length=12, max_length=128)
     invite_code: str = Field(default="", max_length=200)
 
 class PasswordChange(StrictModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, str_strip_whitespace=False)
     current_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=12, max_length=128)
 
@@ -23,6 +25,12 @@ class Location(StrictModel):
     min_elevation_deg: float = Field(default=5, ge=0, le=60)
     timezone: str = Field(default="America/New_York", max_length=80)
     alerts: bool = True
+    horizon_profile: list[float] = Field(default_factory=list, max_length=8)
+    @field_validator("horizon_profile")
+    @classmethod
+    def horizon_values(cls, v):
+        from .horizon import validate_profile
+        return validate_profile(v)
     @field_validator("timezone")
     @classmethod
     def valid_timezone(cls, v):

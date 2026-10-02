@@ -24,7 +24,9 @@
     const f=(t-a.t_s)/(b.t_s-a.t_s),p={...a,t_s:t};
     for(const key of ['elevation','range_km','sun_altitude','altitude_km'])p[key]=a[key]+f*(b[key]-a[key]);
     p.azimuth=(a.azimuth+f*((b.azimuth-a.azimuth+540)%360-180)+360)%360;
-    p.above=p.elevation>=cutoff;
+    p.horizon_limit_deg=Number.isFinite(a.horizon_limit_deg)&&Number.isFinite(b.horizon_limit_deg)
+      ?a.horizon_limit_deg+f*(b.horizon_limit_deg-a.horizon_limit_deg):cutoff;
+    p.above=p.elevation>=p.horizon_limit_deg;
     p.ordinary=p.above&&p.powered&&p.sun_altitude<0;
     p.jellyfish=p.above&&p.plume&&p.sunlit&&p.sun_altitude<=-4;
     return p;
@@ -35,14 +37,14 @@
     if(focus&&windows.length){x0=Math.max(0,windows[0].start_s-30);x1=Math.min(end,windows.at(-1).end_s+30);}
     if(x1<=x0)x1=x0+1;
     const inView=points.filter(p=>p.t_s>=x0&&p.t_s<=x1);
-    const max=Math.max(cutoff,...inView.map(p=>p.elevation),0);
+    const max=Math.max(cutoff,...inView.map(p=>p.elevation),...inView.map(p=>p.horizon_limit_deg??cutoff),0);
     const min=Math.min(0,...inView.map(p=>p.elevation));
     return {x0,x1,y0:Math.max(-90,Math.max(-15,Math.floor((min-2)/5)*5)),y1:Math.min(90,Math.max(10,Math.ceil((max+3)/5)*5))};
   }
   function phase(p,cutoff) {
     if(!p)return 'No trajectory samples at this time';
     if(p.elevation<0)return 'Below the geometric horizon';
-    if(!p.above)return `Below your ${cutoff}° viewing limit`;
+    if(!p.above)return `Below your ${Number((p.horizon_limit_deg??cutoff).toFixed(1))}° viewing limit`;
     if(p.jellyfish)return 'Sunlit-plume opportunity';
     if(p.ordinary)return 'Powered-night opportunity';
     if(p.sun_altitude>=0)return 'Above horizon · daylight visibility unassessed';
@@ -74,7 +76,7 @@
       ${plan.first?`<div class="viewing-events">${summary('First opportunity',plan.first)}${summary('Highest viewing elevation',plan.peak)}${summary('Last opportunity',plan.last)}</div>`:card(launch)}
       ${points.length?`<div class="viewing-controls"><button id="fullTimeline" class="secondary compact" aria-pressed="true">From liftoff</button><button id="focusTimeline" class="secondary compact" aria-pressed="false" ${plan.first?'':'disabled'}>Zoom to viewing</button><span id="viewingCountdown" class="small muted"></span></div>
       <canvas id="timePlot" aria-label="Elevation above the horizon against elapsed time since launch. Use the time slider for values." role="img"></canvas>
-      <div class="timeline-legend small"><span class="legend-night">Powered-night window</span><span class="legend-plume">Sunlit-plume window</span><span>Dashed: your ${cutoff}° limit</span></div>
+      <div class="timeline-legend small"><span class="legend-night">Powered-night window</span><span class="legend-plume">Sunlit-plume window</span><span>Dashed: your local viewing limit</span></div>
       <label class="time-slider-label" for="timeSlider">Explore flight time<input id="timeSlider" type="range" min="0" max="${points.at(-1).t_s}" step="1" value="${plan.first?.t_s||0}"></label>
       <div id="timeReadout" class="time-readout" aria-live="polite"></div>
       <p class="small muted">The vertical scale fits this path; below −15° may be clipped. Shaded intervals belong to the plotted path only. Click an event above, drag the slider, or tap the chart. Gaps and unpowered segments are not viewing windows.</p>`:''}
@@ -124,7 +126,7 @@
       ctx.fillText('Time since launch (minutes:seconds)',L+(width-L-R)/2,height-15);
       ctx.textAlign='left';ctx.fillStyle='#c7d9e8';ctx.fillText('Elevation above horizon',L,4);
       ctx.save();ctx.beginPath();ctx.rect(L,T,width-L-R,height-T-B);ctx.clip();
-      ctx.strokeStyle='#c7b594';ctx.setLineDash([5,5]);ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(L,y(cutoff));ctx.lineTo(width-R,y(cutoff));ctx.stroke();ctx.setLineDash([]);
+      ctx.strokeStyle='#c7b594';ctx.setLineDash([5,5]);ctx.lineWidth=1.2;ctx.beginPath();let previousLimit=null;for(const p of points){if(previousLimit===null||p.t_s-previousLimit>120)ctx.moveTo(x(p.t_s),y(p.horizon_limit_deg??cutoff));else ctx.lineTo(x(p.t_s),y(p.horizon_limit_deg??cutoff));previousLimit=p.t_s;}ctx.stroke();ctx.setLineDash([]);
       ctx.lineWidth=2.5;
       for(let i=1;i<points.length;i++){
         const a=points[i-1],b=points[i];if(b.t_s-a.t_s>120)continue;

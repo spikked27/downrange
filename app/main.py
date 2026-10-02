@@ -13,7 +13,9 @@ from .config import Settings
 from .models import Credentials, PasswordChange, Location, Preferences, Trajectory, Scenario, PushSubscription
 from .store import Store
 from .security import Limiter, password_hash, verify_password, token_hash, validate_push_endpoint
-from .geometry import predict, utc, illustrative_track
+from .geometry import utc, illustrative_track
+from .prediction_cache import predict
+from .evidence import quality, diagnostic_snapshot
 from .providers import Providers
 from .notifications import Notifier
 from .acquisition import Acquisition
@@ -30,7 +32,8 @@ def cached_prediction(launch_json,loc_json,track_json):
     return {**prediction, 'viewing_plan': viewing_plan(launch, prediction, observer)}
 
 def calculate(launch,loc,track):
-    return cached_prediction(json.dumps(launch,sort_keys=True),json.dumps(loc,sort_keys=True),json.dumps(track,sort_keys=True) if track else "")
+    result = cached_prediction(json.dumps(launch,sort_keys=True),json.dumps(loc,sort_keys=True),json.dumps(track,sort_keys=True) if track else "")
+    return {**result, "quality": quality(launch, result, track)}
 
 class BodyLimit:
     def __init__(self,app): self.app=app
@@ -98,12 +101,19 @@ def create_app(settings=None):
     async def loop():
         while True:
             try:
-                await providers.refresh()
                 await asyncio.to_thread(notifier.plan)
                 await asyncio.to_thread(notifier.deliver)
                 store.set_meta("worker_heartbeat",time.time())
             except asyncio.CancelledError: raise
             except Exception as exc: log.error("Worker iteration failed: %s",type(exc).__name__)
+            await asyncio.sleep(30)
+    async def feed_loop():
+        while True:
+            try:
+                await providers.refresh()
+                store.set_meta("feed_worker_heartbeat", time.time())
+            except asyncio.CancelledError: raise
+            except Exception as exc: log.error("Schedule worker failed: %s", type(exc).__name__)
             await asyncio.sleep(30)
     source_wakeup = asyncio.Event()
     async def sources_loop():
@@ -133,9 +143,14 @@ def create_app(settings=None):
                 lock_file.close()
                 raise RuntimeError("Another Downrange worker uses this appdata. Run one container / one worker.")
         task=asyncio.create_task(loop()) if settings.worker_enabled else None
+        feed_task=asyncio.create_task(feed_loop()) if settings.worker_enabled else None
         source_task=asyncio.create_task(sources_loop()) if settings.worker_enabled and settings.sources_enabled else None
         try: yield
         finally:
+            if feed_task:
+                feed_task.cancel()
+                try: await feed_task
+                except asyncio.CancelledError: pass
             if source_task:
                 source_task.cancel()
                 try: await source_task
@@ -167,6 +182,7 @@ def create_app(settings=None):
         response.headers["X-Frame-Options"]="DENY"
         response.headers["Content-Security-Policy"]="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         if request.url.path.startswith("/api/"): response.headers["Cache-Control"]="no-store"
+        elif request.url.path.startswith("/static/"): response.headers["Cache-Control"]="no-cache"
         return response
 
     def auth(request: Request):
@@ -333,6 +349,9 @@ def create_app(settings=None):
             raise HTTPException(409,"Automatic sources are disabled in this installation")
         source_wakeup.set()
         return {"queued":True,"message":"Source check requested; existing cache and upstream rate limits still apply."}
+    @app.get("/api/diagnostics")
+    def diagnostics(user=Depends(auth)):
+        return diagnostic_snapshot(store, settings, user, __version__)
     @app.get("/api/admin/status")
     def status(user=Depends(admin)):
         return {"feed":store.meta("feed",{}),"worker_heartbeat":store.meta("worker_heartbeat"),"accounts":store.one("SELECT COUNT(*) AS n FROM users")["n"],

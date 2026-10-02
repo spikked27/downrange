@@ -61,7 +61,7 @@
   function markerState(p,cutoff){
     if(!p)return 'no_data';
     if(p.elevation<0)return 'below_horizon';
-    if(p.elevation<cutoff)return 'below_limit';
+    if(p.elevation<(p.horizon_limit_deg??cutoff))return 'below_limit';
     if(p.jellyfish)return 'plume';
     if(p.ordinary)return 'powered';
     return 'unassessed';
@@ -79,7 +79,7 @@
       <div class="observer-controls"><div class="observer-play-controls"><button type="button" id="observerPlay" class="primary compact" aria-pressed="false">Play flight</button><button type="button" id="observerStart" class="secondary compact">First window</button><label>Speed<select id="observerSpeed" aria-label="Flight playback speed"><option value="1">1×</option><option value="10" selected>10×</option><option value="30">30×</option></select></label></div><div class="observer-zoom"><button type="button" id="observerZoomIn" class="secondary compact" aria-label="Zoom in">+</button><span id="observerFov"></span><button type="button" id="observerZoomOut" class="secondary compact" aria-label="Zoom out">−</button></div></div>
       <label class="observer-scrub-label">Flight time · linked to the graph below<input type="range" id="observerTime" min="0" max="${end}" step="1" value="${slider.value}" aria-label="Sky view time since launch"></label>
       <p id="observerStatus" class="observer-status" role="status" aria-live="polite"></p>
-      <p class="small muted observer-footnote">Generic flat horizon at 0°. Dashed amber line: your ${cutoff}° viewing limit. Solid cyan: powered-night guide; amber: sunlit-plume guide; gray/dashed: other or future path. Below-horizon positions are hidden. ${launch.prediction.automatic?'This shows ONE scenario, not every possible flight path.':'This uses the supplied path.'} No local terrain, trees, star map or camera overlay.</p>`;
+      <p class="small muted observer-footnote">Generic flat horizon at 0°. Dashed amber line: your configured viewing limits, including manually entered obstructions. Solid cyan: powered-night guide; amber: sunlit-plume guide; gray/dashed: other or future path. Below-horizon positions are hidden. ${launch.prediction.automatic?'This shows ONE scenario, not every possible flight path.':'This uses the supplied path.'} No downloaded terrain, star map or camera overlay.</p>`;
     const timeline=parent.querySelector('#viewingTimeline');timeline?timeline.before(section):parent.prepend(section);
     const el=id=>section.querySelector('#'+id),canvas=el('observerCanvas'),ctx=canvas.getContext('2d'),scrub=el('observerTime');
     let selected=Number(slider.value),camera=framePath(points),width=800,height=400,disposed=false,playing=false,frame=0,lastFrame=0,playTime=selected,lastRendered=-1,updating=false;
@@ -119,7 +119,7 @@
         const line=[];for(let a=0;a<=360;a+=2)line.push({azimuth:a,elevation:e});lineFrom(line,'rgba(151,187,208,.18)');
         const q=project(camera.azimuth,e,camera,width,height);if(q&&q.y>54&&q.y<height-22)text(e+'°',width/2,q.y,'#849eae');
       }
-      if(cutoff>0){const line=[];for(let a=0;a<=360;a+=1)line.push({azimuth:a,elevation:cutoff});lineFrom(line,'#ccb591',[5,5],1.3);}
+      if(cutoff>0||launch.location.horizon_profile?.length){const line=[];for(let a=0;a<=360;a+=1)line.push({azimuth:a,elevation:root.DownrangeV1.horizonLimit(launch.location.horizon_profile,cutoff,a)});lineFrom(line,'#ccb591',[5,5],1.3);}
       if(el('observerGuide').checked){
         for(let i=1;i<points.length;i++){
           const a=points[i-1],b=points[i];if(b.t_s-a.t_s>120)continue;

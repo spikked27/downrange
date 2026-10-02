@@ -17,7 +17,11 @@ def history_candidates(catalog,launch):
     family=vehicle_family(launch.get('vehicle',''))
     if family is None:return []
     # Explicitly documented analogues; never identify an unrelated launcher as Falcon.
-    targets=['Falcon Heavy Demo 1'] if family=='falcon-heavy' else ['DM-1','Orbcomm OG2']
+    text=' '.join(str(launch.get(k,'')) for k in ('orbit','mission','mission_name')).lower()
+    if family=='falcon-heavy': targets=['Falcon Heavy Demo 1']
+    elif 'transfer' in text or 'geostationary' in text: targets=['SES-9','Thaicom 8']
+    elif 'international space station' in text or 'crew' in text or 'crs' in text: targets=['DM-1','SpaceX CRS-8']
+    else: targets=['Orbcomm OG2','DM-1']
     rows=[r for r in catalog if r.get('analysed_stage')==2 and r.get('mission_name') in targets]
     return sorted(rows,key=lambda r:targets.index(r['mission_name']))[:2]
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone, timedelta
 from .models import Trajectory
+from .horizon import viewing_limit
 
 RAD = math.pi / 180
 R = 6371.0088  # km, mean radius for surface distances
@@ -127,9 +128,10 @@ def predict(launch: dict, observer: dict, track: dict | None) -> dict:
         when=net+timedelta(seconds=p["t_s"])
         xyz=ecef(p["latitude"],p["longitude"],p["altitude_km"])
         s=sun_vector(when); a=look(observer,xyz); sa=solar_altitude(observer,s)
-        above=a["elevation"]>=observer.get("min_elevation_deg",5)
+        limit=viewing_limit(observer,a["azimuth"])
+        above=a["elevation"]>=limit
         sunlit=is_sunlit(xyz,s)
-        out.append({**p,**a,"sun_altitude":sa,"sunlit":sunlit,"above":above,
+        out.append({**p,**a,"sun_altitude":sa,"sunlit":sunlit,"above":above,"horizon_limit_deg":limit,
                     "ordinary":above and p["powered"] and sa<0,
                     "jellyfish":above and p["plume"] and sunlit and sa<=-4})
     visible=[p for p in out if p["above"]]
