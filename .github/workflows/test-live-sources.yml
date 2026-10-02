@@ -1,0 +1,21 @@
+name: Validate public direction and historical-profile adapters
+on:
+  push:
+    branches: [work/auto-trajectories]
+    paths: [app/source_inputs.py, app/trajectory_sources.py, app/profiles.py, scripts/check-live-sources.py, .github/workflows/test-live-sources.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-adapters:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Check public source identity, units, and historical-profile geometry
+        run: python scripts/check-live-sources.py
