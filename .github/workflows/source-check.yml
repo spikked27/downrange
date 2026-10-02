@@ -1,0 +1,58 @@
+name: Inspect public trajectory sources
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/auto-trajectories]
+    paths: [.github/workflows/source-check.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect public schemas and pages without credentials
+        run: |
+          python3 - <<'PY'
+          import urllib.request, urllib.error, json, re
+          from urllib.parse import urljoin
+          def fetch(url):
+              try:
+                  req=urllib.request.Request(url,headers={'User-Agent':'Downrange/0.3 source-compatibility-check (https://github.com/spikked27/downrange)'})
+                  with urllib.request.urlopen(req,timeout=20) as r:
+                      data=r.read(4000000).decode('utf-8','replace')
+                      print('URL',url,'STATUS',r.status,'BYTES',len(data),flush=True)
+                      return data
+              except Exception as e:
+                  print('UNAVAILABLE',url,type(e).__name__,str(e)[:160],flush=True);return ''
+          for host in ('https://jellyfish.johnkrausphotos.com','https://nextspaceflight.com'):
+              print('ROBOTS',fetch(host+'/robots.txt')[:3000])
+          text=fetch('https://jellyfish.johnkrausphotos.com/')
+          scripts=re.findall(r'<script[^>]+src=[\"\x27]([^\"\x27]+)',text)
+          print('JELLYFISH_SCRIPT_URLS',scripts)
+          for src in scripts[:4]:
+              if 'google' in src or 'cloudflare' in src:continue
+              body=fetch(urljoin('https://jellyfish.johnkrausphotos.com/',src))
+              print('PUBLIC_API_PATHS',sorted(set(re.findall(r'[\"\x27`](/api/[^\"\x27` ]{1,140})',body)))[:35])
+          text=fetch('https://nextspaceflight.com/launches/')
+          print('NSF_LINKS',sorted(set(re.findall(r'/launches/details/\d+/?',text)))[:15])
+          text=fetch('https://nextspaceflight.com/launches/details/7826/')
+          print('NSF_DIRECTION_MARKUP',[(m.start(),text[max(0,m.start()-160):m.end()+160]) for m in re.finditer('Northeast',text,re.I)][:3])
+          text=fetch('https://ll.thespacedevs.com/2.3.0/launches/upcoming/?limit=2&mode=detailed&format=json')
+          try:
+              data=json.loads(text)
+              for r in data.get('results',[]):
+                  print('LL2_RECORD',json.dumps(r)[:26000])
+          except ValueError: pass
+          text=fetch('https://api.flightclub.io/v3/api-docs')
+          try:
+              d=json.loads(text)
+              for path,methods in d.get('paths',{}).items():
+                  if any(t in path.lower() for t in ('simulation','mission','telemetry')):
+                      print('FLIGHTCLUB_PATH',path,json.dumps(methods)[:4500])
+              for k,v in d.get('components',{}).get('schemas',{}).items():
+                  if any(t in k.lower() for t in ('simulation','mission','telemetry','stage','trajectory')):
+                      print('FLIGHTCLUB_SCHEMA',k,json.dumps(v)[:5000])
+              print('FLIGHTCLUB_AUTH',json.dumps(d.get('components',{}).get('securitySchemes',{})))
+          except ValueError: pass
+          PY
