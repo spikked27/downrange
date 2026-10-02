@@ -2,5 +2,5 @@ fastapi==0.128.2
 uvicorn==0.48.0
 httpx==0.28.1
 pydantic==2.13.4
-cryptography==46.0.4
+cryptography>=47.0.0,<51.0.0
 pywebpush==2.5.0
