@@ -2,66 +2,40 @@
 
 **The launch isn't local. The view might be.**
 
-A self-hosted, multi-location launch-viewing and space-jellyfish research app with browser push. Version **0.3.0-alpha.2** integrates automatic public-source acquisition and introduces Unraid GUI updates.
+Self-hosted launch-viewing estimates, sunlit-plume/jellyfish geometry and notifications from customizable locations. Current source release: **0.3.1-alpha.1**. Check GitHub Actions for image publication status.
 
-## Update an existing Unraid installation — no terminal required
+## Update through Unraid
 
-Open **Docker → Downrange icon → Edit**. Change **Repository** to:
+Existing users on `ghcr.io/spikked27/downrange:latest`: **Docker → Check for Updates → Update Downrange** after the release workflow succeeds. Keep the same appdata mapping, port, PUBLIC_URL, password and other settings. Reopen or refresh the web app and check its footer version. No source ZIP, reinstall, terminal command or new container is needed.
 
-```
-ghcr.io/spikked27/downrange:latest
-```
+A pinned/local-build installation needs one GUI change: Docker → Downrange icon → Edit → Repository → `ghcr.io/spikked27/downrange:latest` → Apply. Exact-version tags remain available for rollback; latest is a tested **alpha** channel, not a production-accuracy claim. See [Unraid guide](docs/UNRAID.md).
 
-Keep the same container name, appdata mapping, port, PUBLIC_URL, password, and other settings. Click **Apply**, then reopen WebUI. The footer should show **0.3.0-alpha.2** once that release's workflow has succeeded. This first change moves an old pinned-version/local-build installation onto the update channel. Future releases use **Docker → Check for Updates → Update**. Do not add a second container or delete appdata.
+## New: when to look, not just where
 
-`latest` means the current tested **alpha**, not production-stable forecasting. Exact version tags remain available for rollback. The workflow promotes latest only from current main, after tests, fresh-container checks, and an actual old-image upgrade test. It also checks anonymous registry access. Check Actions for the actual build outcome.
+The viewing brief includes an elevation-versus-time-since-liftoff graph. It starts at T+0, shows the saved horizon cutoff, shades modeled powered-night and sunlit-plume intervals, and leaves engine-off gaps separate. A cursor/keyboard-accessible slider reports elapsed time, observer-local clock time, true azimuth, elevation and slant distance. Switch between the full modeled ascent and a zoom around viewing intervals. The old azimuth/elevation chart is retained as an expandable view.
 
-Before changing application version, Downrange creates a consistent SQLite snapshot and copies the notification key into `/data/backups/before-<new-version>/`. This does not replace a separate host backup. Existing credentials, locations, preferences, and push subscriptions are reused. A new ADMIN_PASSWORD environment value is not a password reset.
+First, peak and last viewing events are computed from luminous intervals in the plotted path; an unrelated later coasting high point is not the viewing peak. The union of alternative scenario windows is displayed separately so its earlier time cannot be mistaken for the single path's viewing direction. These are sampled estimates, not precise flight telemetry.
 
-## Automatic prediction inputs
+Launch cards now show start-looking T+ time and clock time, direction, horizon angle, viewing peak and end. The modeled-opportunities count/filter requires an actual modeled luminous interval, rather than just an above-horizon point. Broad estimates are sorted after better-constrained cases. Source progress and status are visible on the feed, which refreshes while open. An administrator can request a cached/rate-limited source recheck. Sources retry promptly when the first schedule is still loading.
 
-Every provider/vehicle in the cached schedule with usable pad coordinates enters the evaluator. There is no Falcon-9-only gate. That is not a promise of equally good evidence for all missions.
+Observer-grid cloud forecasts appear on up to six feed cards and in every requested viewing brief. The requested forecast time is the modeled viewing peak (or liftoff when no viewing peak exists). Weather is still separate from geometric opportunity and does not gate alerts.
 
-- Launch Library 2 supplies the paginated schedule, pads, vehicles and mission information, under a persistent request budget.
-- Next Spaceflight public mission pages and the Jellyfish site's available heading metadata supply matched departure directions when available.
-- Linked recognized operator/agency pages are checked for explicitly stated flight directions.
-- Historical webcast-derived Falcon-family ascent analogues are fetched automatically. A previous flight is never relabeled as current telemetry.
-- Flight Club simulation acquisition is optional with a suitable `FLIGHTCLUB_API_KEY`; no purchase or key is included. Authenticated access remains unverified without a key.
+## Prediction inputs and limits
 
-Sources are cached and checked separately from the notification worker. Mission identity, date, coordinates and source provenance matter. The viewing brief includes source evidence and distinguishes simulations, historical analogues and broad assumptions. Manual trajectory imports take precedence. See [sources and limits](docs/SOURCES.md) and [model](docs/MODEL.md).
+Every schedule record with usable pad coordinates is evaluated without a launch-provider whitelist. Automatic readers match public departure directions, available Jellyfish heading metadata, limited explicit directions on linked official pages, and historical Falcon-family ascent analogues. Optional Flight Club simulations require a compatible licensed API key; authenticated access has not been verified here. Manual trajectory imports override estimates. See [sources](docs/SOURCES.md) and [model](docs/MODEL.md).
 
-## Locations and notifications
+This release improves time interpretation, visible diagnostics and viewing instructions; it does not add a comprehensive new trajectory archive or validate all forecasts. Generic ascent envelopes can produce false positives and false negatives. Comprehensive aviation/maritime-notice/PDF ingestion, broader historical vehicle coverage, line-of-sight clouds, calibrated brightness, plume evolution and later-burn/daylight coverage remain unfinished.
 
-Private accounts, up to ten saved locations each, town search, coordinates, foreground device location, per-location timezones and horizon cutoffs. Separate powered-night and sunlit-plume intervals, a sky-path chart, observer-grid cloud forecasts, and persistent server-side push reminders.
+## Accounts, data and notifications
 
-HTTPS is required for phone push. Keep the exact working `PUBLIC_URL`. Enable this device, master scheduled alerts, and per-location alerts. Inferred-path reminders require **Include experimental estimated trajectories**. Broad low-information cases also require **Include broad / low-information candidates**. Quiet hours and stale/uncertain launch times suppress alerts. Send a test and verify actual receipt on the phone; server acceptance is not proof of delivery.
+Multiple private accounts and saved locations, town/coordinate entry, optional foreground GPS, timezones, horizon cutoffs, quiet hours and server-side browser push. Phone push requires the exact working HTTPS origin in PUBLIC_URL. Keep this setting unchanged during updates. Inferred-path alerts require estimate opt-in; low-information cases also require broad-candidate opt-in. This release does not automatically change alert settings.
 
-## New Unraid install
+A consistent pre-upgrade database/key snapshot is created under `/data/backups/before-<version>/`. Keep a separate host backup too. Existing passwords, sessions, locations, preferences, push subscriptions and VAPID keys are reused. A bootstrap ADMIN_PASSWORD value is not a reset for an existing account. See [security](docs/SECURITY.md).
 
-Use [templates/downrange.xml](templates/downrange.xml), which points to latest. The optional one-time installer is:
+## Testing
 
-```bash
-curl -fsSL --retry 3 https://raw.githubusercontent.com/spikked27/downrange/main/scripts/install-unraid.sh -o /tmp/downrange-install.sh && bash /tmp/downrange-install.sh
-```
+The pipeline runs Python regression tests, JavaScript timeline assertions, desktop/phone browser interactions over actual local HTTP, fresh-container startup/permissions/restart checks, and replacement tests using both published 0.2 and 0.3 predecessor images. It publishes only the tested image and verifies anonymous latest pulls. Browser fixtures are synthetic and real push is disabled; this is not sighting/forecast validation. See [release notes](docs/RELEASE-0.3.1.md) and Actions for actual outcomes.
 
-Then Docker → Add Container → Downrange. Default port 8097; appdata `/mnt/user/appdata/downrange`; username `admin`; choose a 12+ character bootstrap password. HTTPS may be configured after the initial LAN test. This is a saved template, not a Community Applications listing. See [Unraid guide](docs/UNRAID.md).
+For development: install `requirements-dev.txt`, run `python -m pytest -q`, `node tests/test_timeline.cjs`, and syntax-check the JavaScript. Browser tests require Playwright 1.57.0 and its Chromium runtime (`python -m playwright install --with-deps chromium`), then `python scripts/browser-smoke.py`. Use one container/worker per appdata directory, with separate demo data. Normal users should use the published image and [Unraid template](templates/downrange.xml).
 
-## Validation and remaining work
-
-135 automated local tests passed for the integrated release preparation. CI separately tests the published predecessor image's data surviving container replacement. Do not infer CI success from this paragraph: see the repository's Actions run and [validation record](docs/VALIDATION.md).
-
-This remains a research alpha. Generic trajectories are estimates, not vehicle performance certification. No calibrated detection probabilities, comprehensive NOTAM/NAVWARN/PDF ingestion, terrain model, line-of-sight cloud integration, universal later-burn/daylight coverage, or historically validated sighting accuracy yet. Weather is shown separately and does not gate alerts. Upstream feeds may omit unannounced or some suborbital flights. No app-store release or background GPS tracking.
-
-## Development
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements-dev.txt
-python -m pytest -q
-node --check app/static/app.js
-node --check app/static/sources-ui.js
-node --check app/static/sw.js
-```
-
-Single worker/container per appdata. Use separate appdata for `DEMO_MODE=true`. No privileged mode, Docker socket, or additional database service is required. MIT source license; third-party data and dependencies retain their terms. Protect appdata and backups; see [security](docs/SECURITY.md). Not affiliated with launch providers or the inspiration site.
+MIT application source; third-party dependencies, data and APIs retain their terms. Check upstream terms before commercial/public use. No analytics trackers. Not affiliated with launch providers or the inspiration site.

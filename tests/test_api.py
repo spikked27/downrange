@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from app.main import create_app
+from app import __version__
 from app.config import Settings
 from app.security import password_hash,verify_password,validate_push_endpoint
 from conftest import HEADERS,PASSWORD,INVITATION
@@ -11,7 +12,7 @@ from conftest import HEADERS,PASSWORD,INVITATION
 def test_health_and_private_default(client):
     assert client.get('/healthz').status_code==200
     assert client.get('/api/locations').status_code==401
-    assert client.get('/api/config').json()['version']=='0.3.0-alpha.2'
+    assert client.get('/api/config').json()['version']==__version__
 
 def test_csrf_headers_and_origin(client):
     creds={'username':'admin','password':PASSWORD}

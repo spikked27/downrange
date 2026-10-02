@@ -32,7 +32,8 @@ class Acquisition:
     async def refresh(self):
         if self.settings.demo_mode or not self.settings.sources_enabled:return {'disabled':True}
         async with self.lock:
-            now=time.time();status={'checked':now,'sources':{},'resolved':0,'attempted':0}
+            now=time.time();status={'checked':now,'sources':{},'resolved':0,'attempted':0,'running':True}
+            self.store.set_meta('acquisition_status',status)
             async def document(name,url,ttl=3600,robots=True):
                 try:
                     body=await self.reader.get(url,ttl,robots=robots)
@@ -125,5 +126,8 @@ class Acquisition:
                     self.store.execute("UPDATE deliveries SET status='cancelled' WHERE launch_id=? AND status='pending' AND kind='reminder'",(launch['id'],))
                 self.store.set_meta('acquired:'+launch['id'],result)
                 if selected or tracks:status['resolved']+=1
+                self.store.set_meta('acquisition_status',status)
+            status['running']=False
+            status['completed']=time.time()
             self.store.set_meta('acquisition_status',status)
             return status

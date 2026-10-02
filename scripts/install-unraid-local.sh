@@ -6,7 +6,7 @@ TEMPLATE_DIR="/boot/config/plugins/dockerMan/templates-user"
 if [[ ! -f /etc/unraid-version ]]; then echo "Run this on the Unraid host." >&2; exit 1; fi
 command -v docker >/dev/null || { echo "Enable Docker in Unraid settings." >&2; exit 1; }
 docker info >/dev/null
-docker build --tag downrange-local:0.3.0-alpha.2 "$ROOT"
+docker build --tag downrange-local:0.3.1-alpha.1 "$ROOT"
 mkdir -p "$TEMPLATE_DIR"
 TARGET="$TEMPLATE_DIR/my-Downrange-Local.xml"
 if [[ -f "$TARGET" ]]; then

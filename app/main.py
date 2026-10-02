@@ -17,6 +17,7 @@ from .geometry import predict, utc, illustrative_track
 from .providers import Providers
 from .notifications import Notifier
 from .acquisition import Acquisition
+from .viewing import plan as viewing_plan
 from .upgrade import protect_existing_data, record_version
 
 log=logging.getLogger("downrange")
@@ -24,7 +25,9 @@ STATIC=Path(__file__).parent/"static"
 
 @lru_cache(maxsize=256)
 def cached_prediction(launch_json,loc_json,track_json):
-    return predict(json.loads(launch_json),json.loads(loc_json),json.loads(track_json) if track_json else None)
+    launch, observer = json.loads(launch_json), json.loads(loc_json)
+    prediction = predict(launch, observer, json.loads(track_json) if track_json else None)
+    return {**prediction, 'viewing_plan': viewing_plan(launch, prediction, observer)}
 
 def calculate(launch,loc,track):
     return cached_prediction(json.dumps(launch,sort_keys=True),json.dumps(loc,sort_keys=True),json.dumps(track,sort_keys=True) if track else "")
@@ -102,6 +105,7 @@ def create_app(settings=None):
             except asyncio.CancelledError: raise
             except Exception as exc: log.error("Worker iteration failed: %s",type(exc).__name__)
             await asyncio.sleep(30)
+    source_wakeup = asyncio.Event()
     async def sources_loop():
         # Separate task: source network delays must not delay scheduled push.
         await asyncio.sleep(3)
@@ -111,7 +115,13 @@ def create_app(settings=None):
             except asyncio.CancelledError: raise
             except Exception as exc:
                 log.error("Source acquisition failed: %s",type(exc).__name__)
-            await asyncio.sleep(300)
+                status = store.meta("acquisition_status",{})
+                store.set_meta("acquisition_status",{**status,"running":False,"error":type(exc).__name__})
+            try:
+                await asyncio.wait_for(source_wakeup.wait(), timeout=300 if store.launches(hydrate=False) else 10)
+            except asyncio.TimeoutError:
+                pass
+            source_wakeup.clear()
     @asynccontextmanager
     async def lifespan(app):
         lock_file=None
@@ -255,7 +265,8 @@ def create_app(settings=None):
             pred=calculate(launch,loc,store.track(launch["id"]))
             results.append({**{k:v for k,v in launch.items() if k!="acquisition"},"prediction":{k:v for k,v in pred.items() if k!="points"}})
         feed=store.meta("feed",{})
-        return {"launches":results,"feed":feed,"stale":time.time()-feed.get("last_success",0)>1800,"location":loc}
+        return {"launches":results,"feed":feed,"stale":time.time()-feed.get("last_success",0)>1800,"location":loc,
+                "sources": {"enabled": settings.sources_enabled, **store.meta("acquisition_status",{})}}
     @app.get("/api/launches/{launch_id}")
     def launch_detail(launch_id:str,location_id:str,user=Depends(auth)):
         launch=launch_for(launch_id); loc=location_for(location_id,user["id"])
@@ -265,7 +276,11 @@ def create_app(settings=None):
         limiter.check(f'weather:{user["id"]}',30,60)
         launch=launch_for(launch_id); loc=location_for(location_id,user["id"])
         if launch.get("demo"): return {"available":False,"reason":"Weather is not fetched for synthetic demo launches"}
-        return await providers.weather(loc,launch["net"])
+        prediction = await asyncio.to_thread(calculate, launch, loc, store.track(launch_id))
+        peak = prediction['viewing_plan'].get('peak')
+        target = peak['time'] if peak else launch['net']
+        forecast = await providers.weather(loc, target)
+        return {**forecast, 'target_time': target, 'target_basis': 'modeled viewing peak' if peak else 'nominal liftoff'}
     @app.get("/api/preferences")
     def preferences(user=Depends(auth)): return Preferences.model_validate_json(user["prefs"])
     @app.put("/api/preferences")
@@ -311,6 +326,13 @@ def create_app(settings=None):
         return {"queued":len(subs),"message":"Test queued; delivery status appears below. Queueing is not delivery confirmation."}
     @app.post("/api/admin/refresh")
     async def refresh(user=Depends(admin)): return await providers.refresh()
+    @app.post("/api/admin/sources/refresh")
+    async def refresh_sources(user=Depends(admin)):
+        limiter.check(f'sources-refresh:{user["id"]}',3,300)
+        if not settings.sources_enabled or not settings.worker_enabled or settings.demo_mode:
+            raise HTTPException(409,"Automatic sources are disabled in this installation")
+        source_wakeup.set()
+        return {"queued":True,"message":"Source check requested; existing cache and upstream rate limits still apply."}
     @app.get("/api/admin/status")
     def status(user=Depends(admin)):
         return {"feed":store.meta("feed",{}),"worker_heartbeat":store.meta("worker_heartbeat"),"accounts":store.one("SELECT COUNT(*) AS n FROM users")["n"],
