@@ -1,13 +1,23 @@
-# Geometry and estimates: global-evidence-1
+# Observer geometry and evidence — alpha 1
 
-Positions use WGS84 geodetic coordinates transformed to Earth-fixed Cartesian coordinates and observer east/north/up coordinates. Track altitude is kilometers above the ellipsoid, observer elevation is meters, and trajectory time is seconds after nominal liftoff. Short-arc longitude interpolation handles the dateline; powered/plume flags apply until the next point. Geometry samples at up to five-second spacing, which is not a five-second forecast-accuracy claim.
+Coordinates use WGS84 geodetic position converted to Earth-fixed Cartesian coordinates, then observer east/north/up coordinates. Track height is kilometers above the ellipsoid; observer elevation is meters; track time is seconds after nominal liftoff. Short-arc longitude interpolation handles the dateline. Powered and plume states apply until the next sample. Sampling at up to five-second intervals is not a five-second forecast-accuracy claim.
 
-Powered-night geometry requires an active modeled burn above the observer's horizon cutoff and the Sun below the observer's horizon. Jellyfish geometry requires a plume-bearing segment above that cutoff, sunlight at altitude, and an observer Sun no higher than minus four degrees. That contrast threshold is heuristic. The approximate solar ephemeris and equatorial-radius spherical shadow omit refraction, penumbra, extinction and plume evolution. Daylight detectability is unassessed rather than impossible.
+## Visibility conditions and local skyline
 
-All launch providers with pad coordinates enter the estimator. An imported track takes precedence, followed by usable mission-specific simulations, then public mission directions combined with historical or engineering ascent estimates. Inferred orbital-plane and launch-site sectors are lower-confidence priors. No hardcoded vehicle whitelist blocks unknown providers.
+Powered-night opportunity requires an active modeled burn above the selected viewing limit, with the Sun below the observer's horizon. Jellyfish opportunity additionally requires a plume-bearing sunlit segment and an observer Sun no higher than minus four degrees. That contrast threshold is heuristic, not a universal visibility boundary. Refraction, penumbra, atmospheric extinction, real plume shape/evolution and brightness are not modeled. Daylight remains unassessed rather than impossible.
 
-Direction and altitude/time variations form alternative paths. Their union can flag a candidate based on one favorable alternative. Counts are sensitivity checks, not probabilities; the plotted path need not be flown. Historical altitude/downrange traces remain analogues when rotated onto a new corridor. Generic profiles are explicitly broad engineering envelopes, not measured performance specifications. Separate simulated booster/upper-stage trajectories are not concatenated.
+The effective viewing limit is the maximum of the global minimum elevation and a circular linear interpolation of the user's optional eight obstruction angles: N, NE, E, SE, S, SW, W, NW. Angles are above a level horizon in true directions. They are not terrain elevations or geographic heights. Empty profiles preserve the previous flat-horizon behavior. The same per-point limit controls ordinary/plume intervals, the observer marker state, the timeline and notification eligibility.
 
-Fallback coverage is incomplete for later burns, unusual suborbital flights, plume persistence, daylight brightness and events absent from upstream schedules. Negative results do not establish invisibility. Clouds cover the observer's forecast grid cell, not the full viewing ray; weather does not gate notifications yet.
+The observer view is a perspective rendering of the modeled angular path. It preserves projection geometry and shares its flight clock with the elapsed-time chart. The marker is enlarged for legibility; apparent plume size and brightness are not predicted. The line is a trajectory guide, not a physically persistent exhaust trail. No camera image, star field, downloaded terrain or automatic local skyline is implied.
 
-References: WGS84 https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84 ; solar coordinates https://aa.usno.navy.mil/faq/sun_approx ; source integration details in SOURCES.md. No reference supplies the generic hand-chosen envelopes as a validated vehicle trajectory.
+## Model sources
+
+Imported tracks take priority over acquired mission simulations, published directions plus historical/engineering ascent shapes, and lower-confidence orbital/site priors. Historical traces do not become current mission telemetry when rotated onto a new corridor. Generic profiles remain engineering envelopes, not measured vehicle specifications. Scenario counts describe sensitivity, never probabilities.
+
+The plotted path's first, highest luminous elevation and last viewing events remain separate from the union across alternative scenarios. A nonluminous high point is not the viewing peak. Separate booster and upper-stage trajectories are not concatenated. Missing phases, later burns, atypical suborbital events and launches absent from upstream schedules can remain unassessed.
+
+## Weather and validation
+
+Open-Meteo observer-grid conditions are requested around the modeled viewing peak where available. They do not describe the entire low-angle viewing ray and do not filter notifications in this alpha. Field validation against sourced real sightings remains necessary; successful code/browser tests establish implementation behavior, not skywatching detection rates.
+
+References: WGS84 https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84 ; approximate solar coordinates https://aa.usno.navy.mil/faq/sun_approx . Source acquisition details and boundaries are in SOURCES.md. These references do not certify the hand-chosen generic ascent envelopes.

@@ -2,32 +2,44 @@
 
 **The launch isn't local. The view might be.**
 
-Self-hosted launch-viewing estimates, jellyfish geometry and notifications from customizable locations. Source version **0.3.2-alpha.1** adds an observer-local perspective. Check Actions for completed publication before updating.
+A self-hosted launch-viewing planner with customizable locations, observer-local sky playback, time-based viewing windows, source provenance and browser notifications. **1.0.0-alpha.1** is the first consolidated alpha milestone, not a claim of production forecasting accuracy. Check [the release record](docs/RELEASE-1.0-ALPHA.md) and Actions for publication status.
 
-## Unraid GUI update
+## Update in Unraid
 
-On `ghcr.io/spikked27/downrange:latest`, use **Docker → Check for Updates → Update Downrange**. Keep appdata, PUBLIC_URL, port, password and other settings unchanged. Reopen the app and check the footer version. No new container or source download is required. A previously pinned/local image needs a one-time GUI Repository change to the latest reference. Exact-version images remain rollback points. See [Unraid instructions](docs/UNRAID.md).
+On `ghcr.io/spikked27/downrange:latest`: **Docker → Check for Updates → Update Downrange**. Keep the same appdata, port, PUBLIC_URL, password and other settings. Reopen the web app and check the footer version. No terminal, source ZIP, reinstall or second container is required. Pinned/local-build installations need a one-time GUI Repository change to the latest reference. [Installation and rollback](docs/UNRAID.md).
 
-## Your vantage point
+## Alpha 1 refinements
 
-Open a launch's **Viewing brief → Your view of the sky**. The new view appears above the existing time graph when a modeled path is available. It looks outward from the selected saved location, using that observer's calculated azimuth/elevation rather than an overhead map or a launchpad bearing.
+**Your horizon, not just a flat cutoff.** Saved locations now accept eight optional obstruction angles: N, NE, E, SE, S, SW, W, NW. They interpolate between directions and cannot lower the global minimum viewing elevation. A higher southern skyline need not hide a clear eastern view. The observer perspective, timeline, calculated windows and notification eligibility all use the same limits. These are manually entered angles, not downloaded terrain or a photograph of your surroundings.
 
-Drag the sky to pan/tilt, use +/− to change field of view, select Frame flight, or Follow marker. Play flight replays at 1×, 10× or 30×. Its time slider and the time graph stay synchronized, including graph taps and first/peak/last buttons. Playback is never automatic; it stops when the brief closes or the page is hidden.
+**Find the useful opportunity.** The feed highlights the next future modeled viewing window, preferring better-constrained directions over broad guesses. Search mission, vehicle, provider or site; select a 24-hour range; filter broad estimates out or show only mission-specific paths. The spotlight is still an estimate and can be blocked by clouds or insufficient brightness. Existing sky playback, drag-to-pan, follow, zoom and linked T+ sliders remain.
 
-The position marker is deliberately enlarged. It is hidden below the geometric horizon, filled for modeled powered-night/sunlit-plume phases, and otherwise an unassessed position guide. The line is a trajectory guide, NOT a prediction of visible exhaust. Future and engine-off path segments are differentiated. The horizon is generic and flat; trees, buildings, terrain, star positions, plume brightness/size and camera AR are not modeled. A historical analogue remains an estimate in this view. See [observer release details](docs/RELEASE-0.3.2.md).
+**See what the data actually supports.** Sources & health separates an available service from matched evidence for a specific mission. Viewing briefs distinguish imported tracks, simulations, published direction plus historical ascent, and generic/orbital assumptions. Actual source fetch timestamps are no longer confused with a new research attempt. Source components expire independently; payload/orbit changes and schedule shifts cause rechecks. One malformed record no longer stops the whole acquisition cycle.
 
-## Existing features
+**More appropriate historical analogues.** Falcon 9 station/crew missions, transfer-orbit missions and other flights use different named historical ascent candidates instead of every mission using the same two traces. Falcon Heavy remains a separate analogue family. This improves selection; it does not reconstruct the new mission or establish equally strong data for other vehicles.
 
-The time graph plots elevation against time since liftoff, with viewing-window zoom, cursor, local times, compass bearings, horizon cutoff and separate burn/plume windows. Feed cards show when to start looking and source status. Observer-grid weather is requested near the modeled viewing peak, shown separately, and does not gate alerts.
+**Reliability.** Schedule fetching, source acquisition and notification scheduling run separately. Shared bounded geometry caching avoids recalculation for mere feed timestamp updates. Unsent reminders cancelled by a changed prediction can be rescheduled; sent reminders cannot be requeued by this path. Password whitespace is preserved. Versioned web assets and cache revalidation reduce stale-interface confusion. Sources & health offers a redacted diagnostic download, never an automatic upload.
 
-All launch-provider records with usable pad coordinates enter the evaluator. Automatic source readers use available matched departure directions, limited linked official information and historical Falcon-family ascent analogues; optional Flight Club simulations require a suitable API key. Manual tracks override estimates. Generic paths are not validated mission guidance. Comprehensive hazard-notice/PDF ingestion, wider historic vehicle data, directional clouds, brightness calibration and later-burn/daylight coverage remain unfinished. See [sources](docs/SOURCES.md) and [model](docs/MODEL.md).
+## Viewing and notifications
 
-Private accounts and saved locations, horizon cutoffs, timezones, quiet hours and server-side browser push are retained. Phone push needs the exact working HTTPS origin in PUBLIC_URL. Estimate and low-information alerts require their existing opt-ins. The update does not change permissions or settings. Pre-upgrade database/key snapshots and the normal external appdata backup should be kept. See [security](docs/SECURITY.md).
+Choose a saved location, open a launch's **Viewing brief**, and explore **Your view of the sky** above **Visibility after liftoff**. The marker is deliberately enlarged, and the path is a guide, not a forecast of apparent plume size, brightness or a permanent trail. First, peak and last events use modeled luminous intervals; alternative scenario windows are shown separately. No camera feed, downloaded skyline, live guidance or automatic background GPS tracking is implied.
 
-## Validation
+Phone push requires a working HTTPS origin. Register the device, enable scheduled alerts, and enable that saved location. Inferred-path reminders require the existing estimate opt-in. Broad low-information cases also require candidate opt-in. Existing alert settings are not automatically changed on update. Weather still appears separately and does not gate alerts.
 
-New geometry assertions cover perspective projection, north crossing, camera orientation, horizon clipping and field-of-view fitting. Full pipeline tests exercise both graph and perspective at desktop/phone sizes over local HTTP, then upgrade isolated data from published predecessor images before publishing. Test fixtures are synthetic and do not validate actual visibility or phone push delivery. Refer to the release record and Actions for completed results.
+## Scope of source coverage
 
-Development: install requirements-dev.txt, run pytest and `node tests/test_observer.cjs`. Browser tests use Playwright 1.57.0/Chromium and `scripts/browser-smoke.py` plus `scripts/observer-browser-smoke.py`. The renderer uses only local assets. No device camera, motion, geolocation or new network-service permission is requested for this view.
+Every scheduled record with usable pad coordinates is evaluated without a launch-provider whitelist. Automatic readers check available Next Spaceflight direction facts, Jellyfish heading metadata, limited explicit directions on linked official pages, and historical Falcon-family webcast ascent data. Flight Club is optional and requires a compatible licensed API key; authenticated retrieval has not been verified here. Manual tracks override automatic estimates.
 
-MIT application source; third-party data and APIs retain their terms. The latest image is still an alpha, not a production-accuracy claim.
+No upstream source promises every unannounced or obscure suborbital event. An engineering envelope is not an actual mission trajectory. Comprehensive hazard-notice/PDF ingestion, a broad non-Falcon historical archive, line-of-sight weather, plume evolution, calibrated brightness, universal later burns/daylight support and historical sighting validation remain incomplete. Read [source details](docs/SOURCES.md) and [model assumptions](docs/MODEL.md).
+
+## Installation and data
+
+The [Unraid template](templates/downrange.xml) uses latest. Default port 8097; appdata `/mnt/user/appdata/downrange`; first account `admin`. Keep the exact working PUBLIC_URL when updating. A consistent database/key snapshot is saved before an application-version change; maintain your own external backup too. Existing accounts, sessions, locations, preferences and notification keys are reused. Do not delete appdata or run two containers against it.
+
+The alpha is intended for private self-hosting, not an audited public SaaS. Diagnostics exclude exact locations, names, usernames, hostnames, passwords, cookies, API keys and push endpoints. Database backups are private and contain account data. [Security and privacy](docs/SECURITY.md).
+
+## Development and validation
+
+Run `python -m pytest -q`, `node tests/test_timeline.cjs`, `node tests/test_observer.cjs` and `node tests/test_v1.cjs`. Browser tests use Playwright 1.57.0 with Chromium: `scripts/browser-smoke.py`, `scripts/observer-browser-smoke.py`, and `scripts/pwa-smoke.py`. The separate `scripts/check-history-sources.py` performs bounded live archive compatibility checks, not sighting validation.
+
+The release pipeline tests actual HTTP desktop/mobile interactions and isolated predecessor-image upgrades before publishing the tested Linux amd64 image. It verifies anonymous latest pulls. See the release record for completed results, not just the workflow definition. MIT application source; third-party dependencies and data retain their licenses and usage terms.
