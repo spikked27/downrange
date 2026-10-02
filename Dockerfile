@@ -1,5 +1,5 @@
 FROM python:3.13-slim-bookworm
-ARG VERSION=0.3.1-alpha.1
+ARG VERSION=0.3.2-alpha.1
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Downrange" \
       org.opencontainers.image.description="Self-hosted launch visibility research and push alerts" \

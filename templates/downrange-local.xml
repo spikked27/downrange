@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <Container version="2">
   <Name>Downrange-Local</Name>
-  <Repository>downrange-local:0.3.1-alpha.1</Repository>
+  <Repository>downrange-local:0.3.2-alpha.1</Repository>
   <Network>bridge</Network>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
   <Support>https://github.com/spikked27/downrange/issues</Support>
   <Project>https://github.com/spikked27/downrange</Project>
-  <Overview>Developer local-build fallback. For normal Unraid GUI updates use the registry template with ghcr.io/spikked27/downrange:latest instead. Source estimates are not confirmed trajectories. HTTPS is required for phone push.</Overview>
+  <Overview>Developer local-build fallback. For normal Unraid GUI updates use ghcr.io/spikked27/downrange:latest. Source estimates are not confirmed trajectories. HTTPS is required for phone push.</Overview>
   <Category>Other:</Category>
   <WebUI>http://[IP]:[PORT:8097]/</WebUI>
   <Icon>https://raw.githubusercontent.com/spikked27/downrange/main/app/static/icon-192.png</Icon>

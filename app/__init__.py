@@ -1,2 +1,2 @@
 """Downrange: self-hosted launch visibility research and alerts."""
-__version__ = "0.3.1-alpha.1"
+__version__ = "0.3.2-alpha.1"

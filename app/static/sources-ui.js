@@ -1,6 +1,6 @@
 'use strict';
-// Keep acquisition/provenance presentation separate from the basic app shell.
-// state, esc and fmt are supplied by app.js; only escaped source text is inserted.
+// Acquisition evidence and observer perspective extend the basic app without
+// changing its prediction, credentials, locations, or notification settings.
 const sourceDetail = document.querySelector('#detailContent');
 function renderSourceEvidence() {
   const p = state.detail?.prediction;
@@ -50,3 +50,43 @@ new MutationObserver(() => {
       ? 'Low-information estimate' : 'Source details in brief';
   });
 }).observe(launchCards, { childList: true });
+
+const OBSERVER_ASSET_VERSION='0.3.2-alpha.1';
+let observerAssets,observerCleanup,observerSlider,pendingObserverSlider,observerGeneration=0;
+function loadObserverAssets(){
+  if(observerAssets)return observerAssets;
+  observerAssets=Promise.all([
+    new Promise((resolve,reject)=>{
+      const link=document.createElement('link');link.rel='stylesheet';link.href='/static/observer.css?v='+OBSERVER_ASSET_VERSION;
+      link.onload=resolve;link.onerror=()=>reject(new Error('Sky-view stylesheet could not load. Refresh the page.'));document.head.appendChild(link);
+    }),
+    new Promise((resolve,reject)=>{
+      const script=document.createElement('script');script.src='/static/observer.js?v='+OBSERVER_ASSET_VERSION;
+      script.onload=resolve;script.onerror=()=>reject(new Error('Sky-view renderer could not load. Refresh the page.'));document.head.appendChild(script);
+    })
+  ]);
+  return observerAssets;
+}
+function disposeObserver(){
+  observerGeneration++;observerCleanup?.();observerCleanup=null;observerSlider=null;pendingObserverSlider=null;
+}
+function renderObserver(){
+  const slider=sourceDetail.querySelector('#timeSlider');
+  if(slider&&(slider===observerSlider||slider===pendingObserverSlider))return;
+  disposeObserver();
+  const launch=state.detail;
+  if(!slider||!launch?.prediction?.points?.length||!document.querySelector('#detailDialog').open)return;
+  const ticket=observerGeneration;pendingObserverSlider=slider;
+  loadObserverAssets().then(()=>{
+    if(ticket!==observerGeneration||!slider.isConnected||state.detail!==launch)return;
+    pendingObserverSlider=null;observerSlider=slider;
+    observerCleanup=window.DownrangeObserver.mount(sourceDetail,launch,slider);
+  }).catch(error=>{
+    if(ticket!==observerGeneration||!slider.isConnected)return;
+    pendingObserverSlider=null;observerSlider=slider;
+    const notice=document.createElement('p');notice.className='notice observer-load-error';notice.textContent=error.message;
+    sourceDetail.prepend(notice);
+  });
+}
+new MutationObserver(renderObserver).observe(sourceDetail,{childList:true});
+document.querySelector('#detailDialog').addEventListener('close',disposeObserver);
