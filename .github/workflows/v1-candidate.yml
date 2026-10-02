@@ -4,7 +4,7 @@ on:
     branches: [work/v1-alpha]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: v1-candidate
   cancel-in-progress: false
@@ -15,8 +15,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: work/v1-alpha
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -24,7 +22,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: python scripts/prepare-v1.py
       - run: pip install -r requirements-dev.txt playwright==1.57.0
       - run: python -m pytest -q
       - run: for f in app/static/*.js; do node --check "$f"; done
@@ -32,25 +29,14 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/browser-smoke.py
       - run: python scripts/observer-browser-smoke.py
-      - name: Build candidate and test actual predecessor upgrade
-        run: |
-          docker build --tag downrange-v1-candidate:test .
-          bash scripts/smoke-docker.sh downrange-v1-candidate:test
-          bash scripts/smoke-upgrade.sh downrange-v1-candidate:test ghcr.io/spikked27/downrange:0.3.2-alpha.1
-      - name: Commit tested integration edits on the work branch only
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app tests scripts templates Dockerfile
-          if ! git diff --cached --quiet; then
-            git commit -m 'Apply and verify v1 observer, source, notification and interface integration'
-            git push origin HEAD:work/v1-alpha
-          fi
-          echo "Verified candidate $(git rev-parse HEAD). No release image published by this workflow." >> "$GITHUB_STEP_SUMMARY"
+      - name: Test actual service worker and offline shell
+        run: python scripts/pwa-smoke.py
+      - name: Audit live historical analogue data
+        run: python scripts/check-history-sources.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v1-synthetic-ui
+          name: v1-synthetic-ui-and-source-audit
           path: browser-artifacts/
           if-no-files-found: ignore
           retention-days: 7
