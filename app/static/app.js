@@ -87,16 +87,21 @@ function renderCards(){
   $$('[data-launch]').forEach(b=>b.onclick=run(()=>openDetail(b.dataset.launch)));
   loadCardWeather();
 }
-async function openDetail(id){
-  const l=await api(`/launches/${encodeURIComponent(id)}?location_id=${encodeURIComponent(state.location.id)}`);state.detail=l;
+async function openDetail(id,options={}){
+  const generation=state.detailGeneration=(state.detailGeneration||0)+1;
+  const locationId=state.location?.id;
+  const l=options.snapshot||await api(`/launches/${encodeURIComponent(id)}?location_id=${encodeURIComponent(locationId)}`);
+  if(generation!==state.detailGeneration||locationId!==state.location?.id||(!options.snapshot&&state.detail&&$('#detailDialog').open&&state.detail.id!==id))return;
+  state.detail=l;
   const p=l.prediction;const win=(name,rows)=>rows.length?`<h3>${name}</h3>${rows.map(w=>`<p>${esc(fmt(w.start))} — ${esc(fmt(w.end,'time'))}</p>`).join('')}`:'';
   $('#detailContent').innerHTML=`<h2 class="dialog-heading">${esc(l.name)}</h2><p class="muted">${esc(l.pad.name)} · ${esc(l.provider)}<br>${launchTime(l)} · ${esc(l.status_name)}</p>${l.demo?'<div class="detail-warning">SYNTHETIC DEMO. Not an upcoming real launch.</div>':''}${p.warnings.map(w=>`<div class="detail-warning">${esc(w)}</div>`).join('')}<div class="detail-grid"><div><small>Ordinary launch</small><strong>${esc(p.ordinary)}</strong></div><div><small>Sunlit plume</small><strong>${esc(p.jellyfish)}</strong></div><div><small>Best geometric elevation</small><strong>${p.max_elevation_deg==null?'Unknown / outside track':p.max_elevation_deg+'° · '+esc(p.direction)}</strong></div></div>${p.points.length?`<div class="plot-box"><h3>${p.automatic?'One assumed path across your sky':'Path across your sky'}</h3><canvas id="skyPlot" width="1000" height="380" aria-label="Predicted azimuth and elevation path"></canvas><p class="small muted">True north = 0°/360° · cyan: powered flight · amber: sunlit plume in twilight · gray: other track segments. ${p.automatic?'Only one favorable scenario is shown; the actual trajectory is unknown.':'This is the supplied path, not a measured flight.'}</p></div>`:'<div class="notice subtle">No path is drawn because there is no mission trajectory. Launchpad direction is not a substitute for where the rocket will appear.</div>'}<div class="windows">${win('Possible powered-flight window',p.ordinary_windows)}${win('Favorable jellyfish geometry',p.jellyfish_windows)}</div>${p.scenario_counts?`<div class="notice subtle small">${p.scenario_counts.total} assumed scenarios checked: ${p.scenario_counts.ordinary} with powered-night geometry; ${p.scenario_counts.jellyfish} with sunlit-plume geometry. These counts are not probabilities. Elevation range among above-horizon scenarios: ${p.elevation_range_deg?p.elevation_range_deg.join('–')+'°':'none'}.</div>`:''}<h3>Trajectory provenance</h3><p class="small muted">${esc(p.source)}${p.source_url?`<br><a href="${esc(p.source_url)}" target="_blank" rel="noopener noreferrer">Trajectory source ↗</a>`:''}<br>${esc(p.notes||'')}</p><h3>Viewing conditions</h3><div id="detailWeather" class="notice subtle small">Checking the observer’s forecast grid cell…</div><details><summary>Mission information</summary><p class="small muted top-gap">${esc(l.mission||'No description supplied.')}</p><p class="small muted">Provider record last updated: ${esc(fmt(l.provider_updated))}<br>Launch ID: ${esc(l.id)}</p></details>${state.user.admin?`<details class="detail-admin"><summary>Administrator · Flight path tools</summary><p class="small muted">A source label is not a validation certificate. Only mark a path mission-specific when it is actually sourced for this launch. Imported points use seconds after liftoff, degrees, and kilometers above the WGS84 ellipsoid.</p><form id="trackForm"><label>Import trajectory JSON<input id="trackFile" type="file" accept=".json,application/json"></label><label>Trajectory document<textarea id="trackJSON" spellcheck="false" placeholder='{"source":"Source and mission", "kind":"estimated", "points":[...]}'></textarea></label><div class="inline"><button class="primary" type="submit">Save trajectory</button><button class="secondary" id="deleteTrack" type="button">Remove trajectory</button></div></form><hr><h3>Explore a hypothetical heading</h3><p class="small muted">This uses a hand-chosen generic ascent, not actual vehicle telemetry. Do not assume a heading from a mission name. Saving it replaces the current trajectory for this launch.</p><form id="scenarioForm"><label>Initial heading, degrees clockwise from true north<input id="scenarioHeading" type="number" min="0" max="359.999" step="any" placeholder="Enter a direction to explore" required></label><label class="check"><input type="checkbox" required>I understand this is a what-if scenario, not a mission forecast.</label><button class="secondary" type="submit">Save experimental scenario</button></form></details>`:''}`;
   if(!$('#detailDialog').open)$('#detailDialog').showModal();
   if(p.points.length)drawSky(p.points,state.location.min_elevation_deg);
   state.timelineCleanup?.();
   state.timelineCleanup=DownrangeTimeline.mount($('#detailContent'),l);
+  document.dispatchEvent(new CustomEvent('downrange:detail-ready',{detail:{refresh:Boolean(options.refresh)}}));
   if(state.user.admin){
-    const track=await api('/admin/trajectories/'+encodeURIComponent(id));if(state.detail?.id!==id||!$('#trackJSON'))return;$('#trackJSON').value=track?JSON.stringify(track,null,2):'';
+    const track=await api('/admin/trajectories/'+encodeURIComponent(id));if(generation!==state.detailGeneration||state.detail?.id!==id||!$('#trackJSON'))return;$('#trackJSON').value=track?JSON.stringify(track,null,2):'';
     $('#trackFile').onchange=run(async e=>{const f=e.target.files[0];if(!f)return;if(f.size>1024*1024)throw new Error('Trajectory file must be under 1 MiB');$('#trackJSON').value=await f.text();});
     $('#trackForm').onsubmit=run(async e=>{e.preventDefault();let data;try{data=JSON.parse($('#trackJSON').value);}catch{throw new Error('Invalid trajectory JSON');}await api('/admin/trajectories/'+encodeURIComponent(id),'PUT',data);toast('Trajectory saved');await loadFeed();await openDetail(id);});
     $('#deleteTrack').onclick=run(async()=>{if(!confirm('Remove this launch’s supplied path?'))return;await api('/admin/trajectories/'+encodeURIComponent(id),'DELETE');await loadFeed();await openDetail(id);toast('Trajectory removed');});
@@ -104,9 +109,9 @@ async function openDetail(id){
   }
   try{
     const w=await api(`/weather?launch_id=${encodeURIComponent(id)}&location_id=${encodeURIComponent(state.location.id)}`);
-    if(state.detail?.id!==id||!$('#detailWeather'))return;
+    if(generation!==state.detailGeneration||state.detail?.id!==id||!$('#detailWeather'))return;
     $('#detailWeather').textContent=w.available?`${w.stale?'STALE FORECAST · ':''}Cloud cover: ${w.cloud_cover??'unknown'}% (low ${w.cloud_cover_low??'?'}%, middle ${w.cloud_cover_mid??'?'}%, high ${w.cloud_cover_high??'?'}%). Surface visibility: ${w.visibility==null?'unknown':(w.visibility/1000).toFixed(1)+' km'}. Forecast hour: ${fmt(w.forecast_time)}. Requested for ${w.target_basis||'liftoff'} at ${fmt(w.target_time||l.net)}. ${w.scope}. Weather does not gate alerts in this alpha.`:w.reason;
-  }catch(e){if(state.detail?.id===id&&$('#detailWeather'))$('#detailWeather').textContent=e.message;}
+  }catch(e){if(generation===state.detailGeneration&&state.detail?.id===id&&$('#detailWeather'))$('#detailWeather').textContent=e.message;}
 }
 function drawSky(points,minElevation){
   const canvas=$('#skyPlot'),ctx=canvas.getContext('2d');const W=canvas.width,H=canvas.height,L=65,T=20,B=60,R=25;
@@ -174,7 +179,7 @@ setInterval(()=>{
   if(!document.hidden&&state.user&&['dashboard','sources'].includes(state.page)&&!$('#detailDialog').open&&!$('#refreshButton').disabled)
     loadFeed().catch(e=>toast(e.message,true));
 },60000);
-$('#detailDialog').addEventListener('close',()=>{state.timelineCleanup?.();state.timelineCleanup=null;state.detail=null;});
+$('#detailDialog').addEventListener('close',()=>{state.detailGeneration=(state.detailGeneration||0)+1;state.timelineCleanup?.();state.timelineCleanup=null;state.detail=null;});
 function renderSourceStatus(){
   let panel=$('#sourcePanel');
   if(!panel){panel=document.createElement('div');panel.id='sourcePanel';panel.className='source-panel';$('.feed-toolbar').before(panel);}

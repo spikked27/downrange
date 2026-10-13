@@ -217,7 +217,10 @@
     const onExternalInput=()=>{if(!updating){pause();seek(Number(slider.value),true);}};
     slider.addEventListener('input',onExternalInput);
     const onVisibility=()=>{if(document.hidden)pause();};document.addEventListener('visibilitychange',onVisibility);
+    section.downrangeCapture=()=>({camera:{...camera},autoFrame,follow:el('observerFollow').checked,guide:el('observerGuide').checked,speed:el('observerSpeed').value});
+    section.downrangeRestore=saved=>{if(!saved)return;pause();camera={...saved.camera};autoFrame=Boolean(saved.autoFrame);el('observerFollow').checked=Boolean(saved.follow);el('observerGuide').checked=Boolean(saved.guide);el('observerSpeed').value=saved.speed||'10';queueDraw();};
     const observer=new ResizeObserver(resize);observer.observe(canvas);resize();
+    document.dispatchEvent(new Event('downrange:observer-mounted'));
     return ()=>{if(disposed)return;disposed=true;cancelAnimationFrame(frame);cancelAnimationFrame(drawPending);observer.disconnect();sliderObserver.disconnect();slider.removeEventListener('input',onExternalInput);document.removeEventListener('visibilitychange',onVisibility);section.remove();};
   }
   const exports={vector,basis,project,unproject,circularFrame,framePath,markerState,mount};

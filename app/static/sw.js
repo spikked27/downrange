@@ -1,7 +1,7 @@
 'use strict';
-const VERSION='1.0.0-alpha.1';
+const VERSION='1.0.1-alpha.1';
 const CACHE='downrange-shell-'+VERSION;
-const PATHS=['/','/static/styles.css','/static/viewing.css','/static/v1.css','/static/observer.css',
+const PATHS=['/','/static/auto-refresh.js','/static/auto-refresh.css','/static/styles.css','/static/viewing.css','/static/v1.css','/static/observer.css',
   '/static/app.js','/static/timeline.js','/static/v1-ui.js','/static/observer.js','/static/sources-ui.js',
   '/static/icon.svg','/static/icon-192.png','/static/icon-512.png','/manifest.webmanifest'];
 const cacheKey=path=>path==='/'?'/':path+'?v='+VERSION;
