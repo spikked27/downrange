@@ -35,6 +35,7 @@ def eligible(launch,loc,pred,prefs,now=None):
     now=time.time() if now is None else now
     if (launch.get("feed_seen") is not None and now-launch["feed_seen"]>1800) or not launch.get("feed_active") or launch.get("demo") or not launch.get("time_precise") or not loc.get("alerts"): return False
     if launch.get("status","").lower() not in {"go","tbc"}: return False
+    if launch.get("schedule_verification_pending"): return False
     if not pred["candidate"]: return False
     if pred.get("low_information") and not prefs.include_candidates: return False
     if pred["mode"]=="screening": return prefs.include_candidates and not prefs.jellyfish_only

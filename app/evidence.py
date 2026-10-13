@@ -4,6 +4,7 @@ import hashlib
 import json
 import time
 from .geometry import utc
+from .refresh_policy import source_interval
 
 
 def identity(launch: dict) -> str:
@@ -38,7 +39,7 @@ def usable(acquired: dict, launch: dict, now: float | None = None) -> dict:
 
 
 def needs_research(old: dict, launch: dict, now: float) -> bool:
-    cadence = 3600 if utc(launch['net']).timestamp() < now+2*86400 else 21600
+    cadence = source_interval(launch, now)
     return (old.get('identity') != identity(launch) or old.get('schedule_net') != launch['net']
             or now-old.get('checked', 0) >= cadence)
 

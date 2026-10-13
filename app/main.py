@@ -20,6 +20,7 @@ from .providers import Providers
 from .notifications import Notifier
 from .acquisition import Acquisition
 from .viewing import plan as viewing_plan
+from .refresh_view import snapshot as refresh_snapshot
 from .upgrade import protect_existing_data, record_version
 
 log=logging.getLogger("downrange")
@@ -29,7 +30,7 @@ STATIC=Path(__file__).parent/"static"
 def cached_prediction(launch_json,loc_json,track_json):
     launch, observer = json.loads(launch_json), json.loads(loc_json)
     prediction = predict(launch, observer, json.loads(track_json) if track_json else None)
-    return {**prediction, 'viewing_plan': viewing_plan(launch, prediction, observer)}
+    return {**prediction, 'viewing_plan': viewing_plan(launch, prediction, observer), 'calculated_at': time.time()}
 
 def calculate(launch,loc,track):
     result = cached_prediction(json.dumps(launch,sort_keys=True),json.dumps(loc,sort_keys=True),json.dumps(track,sort_keys=True) if track else "")
@@ -110,7 +111,9 @@ def create_app(settings=None):
     async def feed_loop():
         while True:
             try:
+                before=store.meta('feed',{}).get('last_success')
                 await providers.refresh()
+                if store.meta('feed',{}).get('last_success') != before: source_wakeup.set()
                 store.set_meta("feed_worker_heartbeat", time.time())
             except asyncio.CancelledError: raise
             except Exception as exc: log.error("Schedule worker failed: %s", type(exc).__name__)
@@ -286,7 +289,10 @@ def create_app(settings=None):
     @app.get("/api/launches/{launch_id}")
     def launch_detail(launch_id:str,location_id:str,user=Depends(auth)):
         launch=launch_for(launch_id); loc=location_for(location_id,user["id"])
-        return {**{k:v for k,v in launch.items() if k!="acquisition"},"prediction":calculate(launch,loc,store.track(launch_id)),"location":loc}
+        track=store.track(launch_id)
+        prediction=calculate(launch,loc,track)
+        return {**{k:v for k,v in launch.items() if k!="acquisition"},"prediction":prediction,
+                "location":loc,"freshness":refresh_snapshot(launch,loc,track,prediction,store)}
     @app.get("/api/weather")
     async def weather(launch_id:str,location_id:str,user=Depends(auth)):
         limiter.check(f'weather:{user["id"]}',30,60)

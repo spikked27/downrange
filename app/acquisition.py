@@ -9,6 +9,7 @@ from .source_inputs import (CachedReader, SourceUnavailable, public_url, mission
     nextspaceflight_index, nextspaceflight_facts, jellyfish_facts, official_facts)
 from .trajectory_sources import HISTORY_INDEX, history_candidates, historical_profile, flightclub_tracks
 from .geometry import utc
+from .refresh_policy import source_interval
 from .evidence import identity, needs_research, usable
 
 NSF = 'https://nextspaceflight.com/launches/'
@@ -65,8 +66,9 @@ class Acquisition:
                     except Exception as exc:
                         status['sources'][name] = {'status':'unavailable','reason':type(exc).__name__,'checked':now}
                         return default, {}
-                index, _ = await document('Next Spaceflight', NSF, [], nextspaceflight_index)
-                jelly, jelly_meta = await document('Jellyfish heading metadata', JELLY, {}, json.loads)
+                page_ttl = min(source_interval(l,now) for l in launches)
+                index, _ = await document('Next Spaceflight', NSF, [], nextspaceflight_index, page_ttl)
+                jelly, jelly_meta = await document('Jellyfish heading metadata', JELLY, {}, json.loads, page_ttl)
                 catalog, _ = await document('Historical webcast profiles', HISTORY_INDEX, [], json.loads, 86400, False)
                 status['sources']['Flight Club'] = {'status':'configured' if self.settings.flightclub_key else 'not configured'}
                 launches.sort(key=lambda l: utc(l['net']).timestamp())
@@ -99,7 +101,9 @@ class Acquisition:
                 self.store.set_meta('acquisition_status', status)
 
     async def research(self, launch, old, index, jelly, jelly_meta, catalog, now):
-        cadence = 3600 if utc(launch['net']).timestamp() < now+2*86400 else 21600
+        cadence = source_interval(launch, now)
+        if old.get('schedule_net') != launch['net']:
+            cadence=min(cadence,300)
         evidence, errors, checks, links = [], [], [], list(launch.get('info_urls') or [])
         candidates = [r['url'] for r in index if mission_matches(launch,r['name'])]
         # Remember an exact match even after a mission drops off the index page.

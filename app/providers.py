@@ -57,6 +57,12 @@ class Providers:
             headers=dict(HEADERS)
             if self.settings.ll2_key: headers["Authorization"]="Token "+self.settings.ll2_key
             launches=[];skipped=0;pages=0;next_url=LL2_URL;complete=False;data={}
+            # Keep the imminent 5-minute path within a shared free-tier quota.
+            # Refresh one near-term page often; refresh longer pages less frequently.
+            cached=self.store.launches(hydrate=False)
+            imminent=any(l.get("feed_active") and -3600 <= utc(l["net"]).timestamp()-now <= 6*3600 for l in cached)
+            extra_due=now-meta.get("last_extra_refresh",0)>=3600
+            page_limit=2 if imminent and extra_due else 1 if imminent else 10
             requests_at=[t for t in self.store.meta("ll2_requests",[]) if now-t<3600]
             try:
                 async with httpx.AsyncClient(timeout=25,follow_redirects=False) as client:
@@ -86,7 +92,10 @@ class Providers:
                         if data["results"] and not page_launches:raise ValueError("No launch records could be parsed")
                         for launch in page_launches:launch["feed_seen"]=now
                         launches.extend(page_launches);pages+=1;next_url=data.get("next")
-                        if pages>=10 and next_url:raise ValueError("Snapshot exceeds this cycle budget; coverage marked partial")
+                        if imminent and extra_due and pages>1:
+                            meta["last_extra_refresh"]=now
+                        if next_url and pages>=page_limit:
+                            break  # A partial refresh never deactivates cached launch records.
                     complete=True
             except Exception as exc:
                 meta["error"]=f"Launch feed incomplete/unavailable ({type(exc).__name__}); cached data retained."
@@ -104,7 +113,11 @@ class Providers:
                 meta.update(last_success=now,returned=len(launches),available=data.get("count"),
                             pages=pages,truncated=not complete,skipped=skipped,coverage_days=90)
                 if complete:meta.update(error=None,last_complete=now)
-                meta["next_attempt"]=max(meta["next_attempt"],now+max(self.settings.poll_seconds,pages*300))
+                # 12 primary requests/hour plus at most one extra page/hour,
+                # leaving a request for retries or later pages when budget permits.
+                seconds=300 if imminent else self.settings.poll_seconds
+                meta["refresh_interval_seconds"]=seconds
+                meta["next_attempt"]=max(now+seconds,meta.get("next_attempt",0) if meta.get("error") and not launches else 0)
             self.store.set_meta("feed",meta)
             return meta
     async def geocode(self,q):
