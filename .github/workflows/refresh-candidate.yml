@@ -1,0 +1,31 @@
+name: Verify launch refresh candidate
+on:
+  push:
+    branches: [work/refresh-sharing]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements-dev.txt playwright==1.57.0
+      - run: python -m pytest -q
+      - run: for f in app/static/*.js; do node --check "$f"; done
+      - run: node tests/test_timeline.cjs && node tests/test_observer.cjs && node tests/test_v1.cjs
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/browser-smoke.py
+      - run: python scripts/observer-browser-smoke.py
+      - run: python scripts/pwa-smoke.py
+      - run: docker build -t downrange-refresh:test .
+      - run: bash scripts/smoke-docker.sh downrange-refresh:test
+      - run: bash scripts/smoke-upgrade.sh downrange-refresh:test ghcr.io/spikked27/downrange:1.0.0-alpha.1

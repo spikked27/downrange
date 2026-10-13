@@ -51,7 +51,7 @@ new MutationObserver(() => {
   });
 }).observe(launchCards, { childList: true });
 
-const OBSERVER_ASSET_VERSION='1.0.0-alpha.1';
+const OBSERVER_ASSET_VERSION='1.0.1-alpha.1';
 let observerAssets,observerCleanup,observerSlider,pendingObserverSlider,observerGeneration=0;
 function loadObserverAssets(){
   if(observerAssets)return observerAssets;
